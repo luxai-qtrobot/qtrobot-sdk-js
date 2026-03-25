@@ -2,22 +2,59 @@
 // Edit src/idl/api_core.ts (or api_plugins.ts) and run `npm run gen`.
 
 import type { Robot } from '../client'
-import { ActionHandle } from '../actions'
+import { withSignal } from '../actions'
 import { TypedStreamWriter } from '../streams'
 import { AudioFrameRaw, Frame, ImageFrameRaw } from '@luxai-qtrobot/magpie'
 
+export type MediaPlayFgAudioFileOptions = {
+  /** Path or URI of the audio file. */
+  uri: string
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
+}
+
+export type MediaSetFgAudioVolumeOptions = {
+  /** Volume level in [0.0, 1.0]. */
+  value: number
+}
+
+export type MediaPlayBgAudioFileOptions = {
+  /** Path or URI of the audio file. */
+  uri: string
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
+}
+
+export type MediaSetBgAudioVolumeOptions = {
+  /** Volume level in [0.0, 1.0]. */
+  value: number
+}
+
 export type MediaPlayFgVideoFileOptions = {
+  /** Path or URI of the video file. */
+  uri: string
   /** Playback speed multiplier. */
   speed?: number
   /** Play embedded audio track. */
   with_audio?: boolean
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
+}
+
+export type MediaSetFgVideoAlphaOptions = {
+  /** Alpha transparency in [0.0, 1.0]. */
+  value: number
 }
 
 export type MediaPlayBgVideoFileOptions = {
+  /** Path or URI of the video file. */
+  uri: string
   /** Playback speed multiplier. */
   speed?: number
   /** Play embedded audio track. */
   with_audio?: boolean
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
 }
 
 export class MediaApi {
@@ -25,277 +62,238 @@ export class MediaApi {
 
   /**
    * Play a foreground audio file. Blocks until playback finishes.
-   * @param uri Path or URI of the audio file.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.uri Path or URI of the audio file.
+   * @param options.signal AbortSignal to cancel the operation.
    * @returns boolean
    */
-  async playFgAudioFile(uri: string, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/media/audio/fg/file/play', { uri }, timeoutSec)
-  }
-
-  /** Play a foreground audio file. Blocks until playback finishes. Returns a cancellable handle. */
-  playFgAudioFileAsync(uri: string): ActionHandle<boolean> {
-    const result = this._robot.rpcCall<boolean>('/media/audio/fg/file/play', { uri })
-    const cancel = () => this._robot.rpcCall<void>('/media/audio/fg/file/cancel', {})
-    return new ActionHandle(result, cancel)
+  async playFgAudioFile(options: MediaPlayFgAudioFileOptions): Promise<boolean> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<boolean>('/media/audio/fg/file/play', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/audio/fg/file/cancel', {}))
   }
 
   /**
    * Pause the foreground audio file currently playing.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseFgAudioFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/file/pause', {  }, timeoutSec)
+  async pauseFgAudioFile(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/file/pause', {})
   }
 
   /**
    * Resume the paused foreground audio file.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeFgAudioFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/file/resume', {  }, timeoutSec)
+  async resumeFgAudioFile(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/file/resume', {})
   }
 
   /**
    * Cancel the active foreground audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async cancelFgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/cancel', {  }, timeoutSec)
+  async cancelFgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/stream/cancel', {})
   }
 
   /**
    * Pause the foreground audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseFgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/pause', {  }, timeoutSec)
+  async pauseFgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/stream/pause', {})
   }
 
   /**
    * Resume the paused foreground audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeFgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/resume', {  }, timeoutSec)
+  async resumeFgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/stream/resume', {})
   }
 
   /**
    * Set the foreground audio playback volume.
-   * @param value Volume level in [0.0, 1.0].
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.value Volume level in [0.0, 1.0].
    */
-  async setFgAudioVolume(value: number, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/volume/set', { value }, timeoutSec)
+  async setFgAudioVolume(options: MediaSetFgAudioVolumeOptions): Promise<void> {
+    await this._robot.rpcCall('/media/audio/fg/volume/set', options as Record<string, unknown>)
   }
 
   /**
    * Get the current foreground audio playback volume.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns number
    */
-  async getFgAudioVolume(timeoutSec?: number): Promise<number> {
-    return this._robot.rpcCall<number>('/media/audio/fg/volume/get', {  }, timeoutSec)
+  async getFgAudioVolume(): Promise<number> {
+    return this._robot.rpcCall<number>('/media/audio/fg/volume/get', {})
   }
 
   /**
    * Play a background audio file. Blocks until playback finishes.
-   * @param uri Path or URI of the audio file.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.uri Path or URI of the audio file.
+   * @param options.signal AbortSignal to cancel the operation.
    * @returns boolean
    */
-  async playBgAudioFile(uri: string, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/media/audio/bg/file/play', { uri }, timeoutSec)
-  }
-
-  /** Play a background audio file. Blocks until playback finishes. Returns a cancellable handle. */
-  playBgAudioFileAsync(uri: string): ActionHandle<boolean> {
-    const result = this._robot.rpcCall<boolean>('/media/audio/bg/file/play', { uri })
-    const cancel = () => this._robot.rpcCall<void>('/media/audio/bg/file/cancel', {})
-    return new ActionHandle(result, cancel)
+  async playBgAudioFile(options: MediaPlayBgAudioFileOptions): Promise<boolean> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<boolean>('/media/audio/bg/file/play', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/audio/bg/file/cancel', {}))
   }
 
   /**
    * Pause the background audio file currently playing.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseBgAudioFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/file/pause', {  }, timeoutSec)
+  async pauseBgAudioFile(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/file/pause', {})
   }
 
   /**
    * Resume the paused background audio file.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeBgAudioFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/file/resume', {  }, timeoutSec)
+  async resumeBgAudioFile(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/file/resume', {})
   }
 
   /**
    * Cancel the active background audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async cancelBgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/cancel', {  }, timeoutSec)
+  async cancelBgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/stream/cancel', {})
   }
 
   /**
    * Pause the background audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseBgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/pause', {  }, timeoutSec)
+  async pauseBgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/stream/pause', {})
   }
 
   /**
    * Resume the paused background audio stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeBgAudioStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/resume', {  }, timeoutSec)
+  async resumeBgAudioStream(): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/stream/resume', {})
   }
 
   /**
    * Set the background audio playback volume.
-   * @param value Volume level in [0.0, 1.0].
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.value Volume level in [0.0, 1.0].
    */
-  async setBgAudioVolume(value: number, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/volume/set', { value }, timeoutSec)
+  async setBgAudioVolume(options: MediaSetBgAudioVolumeOptions): Promise<void> {
+    await this._robot.rpcCall('/media/audio/bg/volume/set', options as Record<string, unknown>)
   }
 
   /**
    * Get the current background audio playback volume.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns number
    */
-  async getBgAudioVolume(timeoutSec?: number): Promise<number> {
-    return this._robot.rpcCall<number>('/media/audio/bg/volume/get', {  }, timeoutSec)
+  async getBgAudioVolume(): Promise<number> {
+    return this._robot.rpcCall<number>('/media/audio/bg/volume/get', {})
   }
 
   /**
    * Play a foreground video file. Blocks until playback finishes.
-   * @param uri Path or URI of the video file.
-   * @param options Optional parameters.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.uri Path or URI of the video file.
+   * @param options.speed Playback speed multiplier.
+   * @param options.with_audio Play embedded audio track.
+   * @param options.signal AbortSignal to cancel the operation.
    * @returns boolean
    */
-  async playFgVideoFile(uri: string, options?: MediaPlayFgVideoFileOptions, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/media/video/fg/file/play', { uri, ...options }, timeoutSec)
-  }
-
-  /** Play a foreground video file. Blocks until playback finishes. Returns a cancellable handle. */
-  playFgVideoFileAsync(uri: string, options?: MediaPlayFgVideoFileOptions): ActionHandle<boolean> {
-    const result = this._robot.rpcCall<boolean>('/media/video/fg/file/play', { uri, ...options })
-    const cancel = () => this._robot.rpcCall<void>('/media/video/fg/file/cancel', {})
-    return new ActionHandle(result, cancel)
+  async playFgVideoFile(options: MediaPlayFgVideoFileOptions): Promise<boolean> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<boolean>('/media/video/fg/file/play', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/video/fg/file/cancel', {}))
   }
 
   /**
    * Pause the foreground video file currently playing.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseFgVideoFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/file/pause', {  }, timeoutSec)
+  async pauseFgVideoFile(): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/file/pause', {})
   }
 
   /**
    * Resume the paused foreground video file.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeFgVideoFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/file/resume', {  }, timeoutSec)
+  async resumeFgVideoFile(): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/file/resume', {})
   }
 
   /**
    * Cancel the active foreground video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async cancelFgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/cancel', {  }, timeoutSec)
+  async cancelFgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/stream/cancel', {})
   }
 
   /**
    * Pause the foreground video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseFgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/pause', {  }, timeoutSec)
+  async pauseFgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/stream/pause', {})
   }
 
   /**
    * Resume the paused foreground video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeFgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/resume', {  }, timeoutSec)
+  async resumeFgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/stream/resume', {})
   }
 
   /**
    * Set the foreground video layer transparency.
-   * @param value Alpha transparency in [0.0, 1.0].
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.value Alpha transparency in [0.0, 1.0].
    */
-  async setFgVideoAlpha(value: number, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/set_alpha', { value }, timeoutSec)
+  async setFgVideoAlpha(options: MediaSetFgVideoAlphaOptions): Promise<void> {
+    await this._robot.rpcCall('/media/video/fg/set_alpha', options as Record<string, unknown>)
   }
 
   /**
    * Play a background video file. Blocks until playback finishes.
-   * @param uri Path or URI of the video file.
-   * @param options Optional parameters.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.uri Path or URI of the video file.
+   * @param options.speed Playback speed multiplier.
+   * @param options.with_audio Play embedded audio track.
+   * @param options.signal AbortSignal to cancel the operation.
    * @returns boolean
    */
-  async playBgVideoFile(uri: string, options?: MediaPlayBgVideoFileOptions, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/media/video/bg/file/play', { uri, ...options }, timeoutSec)
-  }
-
-  /** Play a background video file. Blocks until playback finishes. Returns a cancellable handle. */
-  playBgVideoFileAsync(uri: string, options?: MediaPlayBgVideoFileOptions): ActionHandle<boolean> {
-    const result = this._robot.rpcCall<boolean>('/media/video/bg/file/play', { uri, ...options })
-    const cancel = () => this._robot.rpcCall<void>('/media/video/bg/file/cancel', {})
-    return new ActionHandle(result, cancel)
+  async playBgVideoFile(options: MediaPlayBgVideoFileOptions): Promise<boolean> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<boolean>('/media/video/bg/file/play', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/video/bg/file/cancel', {}))
   }
 
   /**
    * Pause the background video file currently playing.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseBgVideoFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/file/pause', {  }, timeoutSec)
+  async pauseBgVideoFile(): Promise<void> {
+    await this._robot.rpcCall('/media/video/bg/file/pause', {})
   }
 
   /**
    * Resume the paused background video file.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeBgVideoFile(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/file/resume', {  }, timeoutSec)
+  async resumeBgVideoFile(): Promise<void> {
+    await this._robot.rpcCall('/media/video/bg/file/resume', {})
   }
 
   /**
    * Cancel the active background video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async cancelBgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/cancel', {  }, timeoutSec)
+  async cancelBgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/bg/stream/cancel', {})
   }
 
   /**
    * Pause the background video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async pauseBgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/pause', {  }, timeoutSec)
+  async pauseBgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/bg/stream/pause', {})
   }
 
   /**
    * Resume the paused background video stream.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async resumeBgVideoStream(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/resume', {  }, timeoutSec)
+  async resumeBgVideoStream(): Promise<void> {
+    await this._robot.rpcCall('/media/video/bg/stream/resume', {})
   }
 
   /**

@@ -6,6 +6,7 @@
  */
 
 import { Robot, AudioFrameRaw } from '../src'
+import { Logger } from '@luxai-qtrobot/magpie'
 import { writeFileSync } from 'fs'
 
 const BROKER_URL  = 'mqtt://localhost:1883'
@@ -16,7 +17,7 @@ const DURATION_MS = 3000
 async function main() {
   const robot = await Robot.connect(BROKER_URL, ROBOT_ID)
 
-  console.log(`Capturing audio for ${DURATION_MS / 1000}s...`)
+  Logger.info(`Capturing audio for ${DURATION_MS / 1000}s...`)
 
   const chunks: Uint8Array[] = []
   let sampleRate = 0
@@ -25,10 +26,10 @@ async function main() {
 
   const unsubscribe = robot.microphone.onIntAudioCh0((frame: AudioFrameRaw) => {
     if (sampleRate === 0) {
-      sampleRate = frame.sample_rate
-      bitDepth   = frame.bit_depth
+      sampleRate = frame.sampleRate
+      bitDepth   = frame.bitDepth
       channels   = frame.channels
-      console.log(`Audio format: ${sampleRate}Hz / ${bitDepth}bit / ${channels}ch`)
+      Logger.info(`Audio format: ${sampleRate}Hz / ${bitDepth}bit / ${channels}ch`)
     }
     if (frame.data instanceof Uint8Array) {
       chunks.push(frame.data)
@@ -45,13 +46,13 @@ async function main() {
   for (const chunk of chunks) { buffer.set(chunk, offset); offset += chunk.length }
 
   writeFileSync(OUTPUT_FILE, buffer)
-  console.log(`Wrote ${total} bytes to ${OUTPUT_FILE}`)
-  console.log(`Play with: ffplay -f s${bitDepth}le -ar ${sampleRate} -ac ${channels} ${OUTPUT_FILE}`)
+  Logger.info(`Wrote ${total} bytes to ${OUTPUT_FILE}`)
+  Logger.info(`Play with: ffplay -f s${bitDepth}le -ar ${sampleRate} -ac ${channels} ${OUTPUT_FILE}`)
 
   robot.close()
 }
 
 main().catch(err => {
-  console.error(err)
+  Logger.error(String(err))
   process.exit(1)
 })

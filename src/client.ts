@@ -62,14 +62,6 @@ export class Robot {
     this.minSdk     = desc.min_sdk    ?? null
     this.maxSdk     = desc.max_sdk    ?? null
 
-    // SDK version compatibility check
-    if (this.minSdk && SDK_VERSION < this.minSdk) {
-      Logger.warning(`Robot: SDK version ${SDK_VERSION} may be too old — robot requires >=${this.minSdk}`)
-    }
-    if (this.maxSdk && SDK_VERSION > this.maxSdk) {
-      Logger.warning(`Robot: SDK version ${SDK_VERSION} may be too new — robot tested up to ${this.maxSdk}`)
-    }
-
     // Build route tables
     for (const [service, meta] of Object.entries(desc.rpc ?? {})) {
       const mqtt = meta.transports?.mqtt

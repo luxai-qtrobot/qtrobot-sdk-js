@@ -6,7 +6,31 @@ import { TypedStreamReader, TypedStreamWriter } from '../streams'
 import { JointCommandFrame } from '../frames/joint_command'
 import { JointStateFrame } from '../frames/joint_state'
 
+export type MotorOnOptions = {
+  /** Motor name to enable torque. */
+  motor: string
+}
+
+export type MotorOffOptions = {
+  /** Motor name to disable torque. */
+  motor: string
+}
+
+export type MotorHomeOptions = {
+  /** Motor name to move to its home position. */
+  motor: string
+}
+
+export type MotorSetVelocityOptions = {
+  /** Motor name. */
+  motor: string
+  /** Velocity value (0 .. velocity_max). */
+  velocity: number
+}
+
 export type MotorSetCalibOptions = {
+  /** Motor name. */
+  motor: string
   /** Calibration offset in degrees. */
   offset?: number
   /** Overload threshold value. */
@@ -22,90 +46,83 @@ export class MotorApi {
 
   /**
    * List available motors and their configuration properties.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns Record<string, unknown>
    */
-  async list(timeoutSec?: number): Promise<Record<string, unknown>> {
-    return this._robot.rpcCall<Record<string, unknown>>('/motor/list', {  }, timeoutSec)
+  async list(): Promise<Record<string, unknown>> {
+    return this._robot.rpcCall<Record<string, unknown>>('/motor/list', {})
   }
 
   /**
    * Enable torque for a motor.
-   * @param motor Motor name to enable torque.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.motor Motor name to enable torque.
    */
-  async on(motor: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/on', { motor }, timeoutSec)
+  async on(options: MotorOnOptions): Promise<void> {
+    await this._robot.rpcCall('/motor/on', options as Record<string, unknown>)
   }
 
   /**
    * Disable torque for a motor.
-   * @param motor Motor name to disable torque.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.motor Motor name to disable torque.
    */
-  async off(motor: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/off', { motor }, timeoutSec)
+  async off(options: MotorOffOptions): Promise<void> {
+    await this._robot.rpcCall('/motor/off', options as Record<string, unknown>)
   }
 
   /**
    * Enable torque for all motors.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async onAll(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/on/all', {  }, timeoutSec)
+  async onAll(): Promise<void> {
+    await this._robot.rpcCall('/motor/on/all', {})
   }
 
   /**
    * Disable torque for all motors.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async offAll(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/off/all', {  }, timeoutSec)
+  async offAll(): Promise<void> {
+    await this._robot.rpcCall('/motor/off/all', {})
   }
 
   /**
    * Move a motor to its home position.
-   * @param motor Motor name to move to its home position.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.motor Motor name to move to its home position.
    */
-  async home(motor: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/move/home', { motor }, timeoutSec)
+  async home(options: MotorHomeOptions): Promise<void> {
+    await this._robot.rpcCall('/motor/move/home', options as Record<string, unknown>)
   }
 
   /**
    * Move all motors to their home positions.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async homeAll(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/move/home/all', {  }, timeoutSec)
+  async homeAll(): Promise<void> {
+    await this._robot.rpcCall('/motor/move/home/all', {})
   }
 
   /**
    * Set the velocity limit for a motor.
-   * @param motor Motor name.
-   * @param velocity Velocity value (0 .. velocity_max).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.motor Motor name.
+   * @param options.velocity Velocity value (0 .. velocity_max).
    */
-  async setVelocity(motor: string, velocity: number, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/velocity/set', { motor, velocity }, timeoutSec)
+  async setVelocity(options: MotorSetVelocityOptions): Promise<void> {
+    await this._robot.rpcCall('/motor/velocity/set', options as Record<string, unknown>)
   }
 
   /**
    * Set calibration parameters for a motor.
-   * @param motor Motor name.
-   * @param options Optional parameters.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.motor Motor name.
+   * @param options.offset Calibration offset in degrees.
+   * @param options.overload_threshold Overload threshold value.
+   * @param options.velocity_max Maximum velocity value.
+   * @param options.store Persist the calibration to config file.
    */
-  async setCalib(motor: string, options?: MotorSetCalibOptions, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/calib/set', { motor, ...options }, timeoutSec)
+  async setCalib(options: MotorSetCalibOptions): Promise<void> {
+    await this._robot.rpcCall('/motor/calib/set', options as Record<string, unknown>)
   }
 
   /**
    * Apply stored calibration to all motors.
-   * @param timeoutSec RPC timeout in seconds.
    */
-  async calibAll(timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/motor/calib/all', {  }, timeoutSec)
+  async calibAll(): Promise<void> {
+    await this._robot.rpcCall('/motor/calib/all', {})
   }
 
   /**
@@ -128,13 +145,13 @@ export class MotorApi {
    * for await (const frame of robot.motor.jointsStateReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  jointsStateReader(queueSize?: number): TypedStreamReader<JointStateFrame> {
+  jointsStateReader(options?: { queueSize?: number }): TypedStreamReader<JointStateFrame> {
     return this._robot.getStreamReader<JointStateFrame>(
       '/motor/joints/state/stream:o',
       JointStateFrame.fromRaw,
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -158,13 +175,13 @@ export class MotorApi {
    * for await (const frame of robot.motor.jointsErrorReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  jointsErrorReader(queueSize?: number): TypedStreamReader<Record<string, unknown>> {
+  jointsErrorReader(options?: { queueSize?: number }): TypedStreamReader<Record<string, unknown>> {
     return this._robot.getStreamReader<Record<string, unknown>>(
       '/motor/joints/error/stream:o',
       raw => ((raw as { value?: Record<string, unknown> }).value ?? raw as Record<string, unknown>),
-      queueSize,
+      options?.queueSize,
     )
   }
 

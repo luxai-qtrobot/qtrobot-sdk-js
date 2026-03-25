@@ -3,44 +3,45 @@
 
 import type { Robot } from '../client'
 
+export type SpeakerSetVolumeOptions = {
+  /** Master speaker volume in [0.0, 1.0]. */
+  value: number
+}
+
 export class SpeakerApi {
   constructor(private readonly _robot: Robot) {}
 
   /**
    * Set the master speaker volume.
-   * @param value Master speaker volume in [0.0, 1.0].
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.value Master speaker volume in [0.0, 1.0].
    * @returns boolean
    */
-  async setVolume(value: number, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/speaker/volume/set', { value }, timeoutSec)
+  async setVolume(options: SpeakerSetVolumeOptions): Promise<boolean> {
+    return this._robot.rpcCall<boolean>('/speaker/volume/set', options as Record<string, unknown>)
   }
 
   /**
    * Get the current master speaker volume.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns number
    */
-  async getVolume(timeoutSec?: number): Promise<number> {
-    return this._robot.rpcCall<number>('/speaker/volume/get', {  }, timeoutSec)
+  async getVolume(): Promise<number> {
+    return this._robot.rpcCall<number>('/speaker/volume/get', {})
   }
 
   /**
    * Mute the speaker.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns boolean
    */
-  async mute(timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/speaker/volume/mute', {  }, timeoutSec)
+  async mute(): Promise<boolean> {
+    return this._robot.rpcCall<boolean>('/speaker/volume/mute', {})
   }
 
   /**
    * Unmute the speaker.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns boolean
    */
-  async unmute(timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/speaker/volume/unmute', {  }, timeoutSec)
+  async unmute(): Promise<boolean> {
+    return this._robot.rpcCall<boolean>('/speaker/volume/unmute', {})
   }
 
 }

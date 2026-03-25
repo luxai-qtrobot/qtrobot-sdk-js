@@ -2,9 +2,11 @@
 // Edit src/idl/api_core.ts (or api_plugins.ts) and run `npm run gen`.
 
 import type { Robot } from '../client'
-import { ActionHandle } from '../actions'
+import { withSignal } from '../actions'
 
 export type TtsSayTextOptions = {
+  /** Plain text to synthesize. */
+  text: string
   /** Engine id (uses default if omitted). */
   engine?: string
   /** Language code, e.g. "en-US". */
@@ -19,6 +21,49 @@ export type TtsSayTextOptions = {
   volume?: number
   /** Speaking style (engine-dependent). */
   style?: string
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
+}
+
+export type TtsSaySsmlOptions = {
+  /** SSML markup string. */
+  ssml: string
+  /** Engine id (uses default if omitted). */
+  engine?: string
+  /** AbortSignal to cancel the operation. */
+  signal?: AbortSignal
+}
+
+export type TtsSetDefaultEngineOptions = {
+  /** Engine id, e.g. "acapela" or "azure". */
+  engine: string
+}
+
+export type TtsSetConfigOptions = {
+  /** Engine-specific config key/value pairs. */
+  config: Record<string, unknown>
+  /** Engine id (uses default if omitted). */
+  engine?: string
+}
+
+export type TtsGetConfigOptions = {
+  /** Engine id (uses default if omitted). */
+  engine?: string
+}
+
+export type TtsGetLanguagesOptions = {
+  /** Engine id (uses default if omitted). */
+  engine?: string
+}
+
+export type TtsGetVoicesOptions = {
+  /** Engine id (uses default if omitted). */
+  engine?: string
+}
+
+export type TtsSupportsSsmlOptions = {
+  /** Engine id (uses default if omitted). */
+  engine?: string
 }
 
 export class TtsApi {
@@ -26,113 +71,103 @@ export class TtsApi {
 
   /**
    * Speak plain text. Blocks until audio playback completes.
-   * @param text Plain text to synthesize.
-   * @param options Optional parameters.
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.text Plain text to synthesize.
+   * @param options.engine Engine id (uses default if omitted).
+   * @param options.lang Language code, e.g. "en-US".
+   * @param options.voice Voice id or name.
+   * @param options.rate Speech rate multiplier.
+   * @param options.pitch Pitch adjustment.
+   * @param options.volume Volume level.
+   * @param options.style Speaking style (engine-dependent).
+   * @param options.signal AbortSignal to cancel the operation.
    */
-  async sayText(text: string, options?: TtsSayTextOptions, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/tts/engine/say/text', { text, ...options }, timeoutSec)
-  }
-
-  /** Speak plain text. Blocks until audio playback completes. Returns a cancellable handle. */
-  sayTextAsync(text: string, options?: TtsSayTextOptions): ActionHandle<void> {
-    const result = this._robot.rpcCall<void>('/tts/engine/say/text', { text, ...options })
-    const cancel = () => this._robot.rpcCall<void>('/tts/engine/cancel', {})
-    return new ActionHandle(result, cancel)
+  async sayText(options: TtsSayTextOptions): Promise<void> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<void>('/tts/engine/say/text', args as Record<string, unknown>)
+    if (!signal) { await rpc; return }
+    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/tts/engine/cancel', {}))
   }
 
   /**
    * Speak SSML markup. Blocks until audio playback completes.
-   * @param ssml SSML markup string.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.ssml SSML markup string.
+   * @param options.engine Engine id (uses default if omitted).
+   * @param options.signal AbortSignal to cancel the operation.
    */
-  async saySsml(ssml: string, engine?: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/tts/engine/say/ssml', { ssml, engine }, timeoutSec)
-  }
-
-  /** Speak SSML markup. Blocks until audio playback completes. Returns a cancellable handle. */
-  saySsmlAsync(ssml: string, engine?: string): ActionHandle<void> {
-    const result = this._robot.rpcCall<void>('/tts/engine/say/ssml', { ssml, engine })
-    const cancel = () => this._robot.rpcCall<void>('/tts/engine/cancel', {})
-    return new ActionHandle(result, cancel)
+  async saySsml(options: TtsSaySsmlOptions): Promise<void> {
+    const { signal, ...args } = options
+    const rpc = this._robot.rpcCall<void>('/tts/engine/say/ssml', args as Record<string, unknown>)
+    if (!signal) { await rpc; return }
+    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/tts/engine/cancel', {}))
   }
 
   /**
    * Set the default TTS engine.
-   * @param engine Engine id, e.g. "acapela" or "azure".
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.engine Engine id, e.g. "acapela" or "azure".
    */
-  async setDefaultEngine(engine: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/tts/default_engine/set', { engine }, timeoutSec)
+  async setDefaultEngine(options: TtsSetDefaultEngineOptions): Promise<void> {
+    await this._robot.rpcCall('/tts/default_engine/set', options as Record<string, unknown>)
   }
 
   /**
    * Get the current default TTS engine id.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns string
    */
-  async getDefaultEngine(timeoutSec?: number): Promise<string> {
-    return this._robot.rpcCall<string>('/tts/default_engine/get', {  }, timeoutSec)
+  async getDefaultEngine(): Promise<string> {
+    return this._robot.rpcCall<string>('/tts/default_engine/get', {})
   }
 
   /**
    * List available TTS engine ids.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns unknown[]
    */
-  async listEngines(timeoutSec?: number): Promise<unknown[]> {
-    return this._robot.rpcCall<unknown[]>('/tts/engines/list', {  }, timeoutSec)
+  async listEngines(): Promise<unknown[]> {
+    return this._robot.rpcCall<unknown[]>('/tts/engines/list', {})
   }
 
   /**
    * Set engine configuration.
-   * @param config Engine-specific config key/value pairs.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.config Engine-specific config key/value pairs.
+   * @param options.engine Engine id (uses default if omitted).
    */
-  async setConfig(config: Record<string, unknown>, engine?: string, timeoutSec?: number): Promise<void> {
-    await this._robot.rpcCall('/tts/engine/configure/set', { config, engine }, timeoutSec)
+  async setConfig(options: TtsSetConfigOptions): Promise<void> {
+    await this._robot.rpcCall('/tts/engine/configure/set', options as Record<string, unknown>)
   }
 
   /**
    * Get current engine configuration.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.engine Engine id (uses default if omitted).
    * @returns Record<string, unknown>
    */
-  async getConfig(engine?: string, timeoutSec?: number): Promise<Record<string, unknown>> {
-    return this._robot.rpcCall<Record<string, unknown>>('/tts/engine/configure/get', { engine }, timeoutSec)
+  async getConfig(options: TtsGetConfigOptions): Promise<Record<string, unknown>> {
+    return this._robot.rpcCall<Record<string, unknown>>('/tts/engine/configure/get', options as Record<string, unknown>)
   }
 
   /**
    * Get supported language codes for an engine.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.engine Engine id (uses default if omitted).
    * @returns unknown[]
    */
-  async getLanguages(engine?: string, timeoutSec?: number): Promise<unknown[]> {
-    return this._robot.rpcCall<unknown[]>('/tts/engine/languages/get', { engine }, timeoutSec)
+  async getLanguages(options: TtsGetLanguagesOptions): Promise<unknown[]> {
+    return this._robot.rpcCall<unknown[]>('/tts/engine/languages/get', options as Record<string, unknown>)
   }
 
   /**
    * Get available voices for an engine.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.engine Engine id (uses default if omitted).
    * @returns unknown[]
    */
-  async getVoices(engine?: string, timeoutSec?: number): Promise<unknown[]> {
-    return this._robot.rpcCall<unknown[]>('/tts/engine/voices/get', { engine }, timeoutSec)
+  async getVoices(options: TtsGetVoicesOptions): Promise<unknown[]> {
+    return this._robot.rpcCall<unknown[]>('/tts/engine/voices/get', options as Record<string, unknown>)
   }
 
   /**
    * Check whether an engine supports SSML.
-   * @param engine Engine id (uses default if omitted).
-   * @param timeoutSec RPC timeout in seconds.
+   * @param options.engine Engine id (uses default if omitted).
    * @returns boolean
    */
-  async supportsSsml(engine?: string, timeoutSec?: number): Promise<boolean> {
-    return this._robot.rpcCall<boolean>('/tts/engine/supports/ssml', { engine }, timeoutSec)
+  async supportsSsml(options: TtsSupportsSsmlOptions): Promise<boolean> {
+    return this._robot.rpcCall<boolean>('/tts/engine/supports/ssml', options as Record<string, unknown>)
   }
 
 }

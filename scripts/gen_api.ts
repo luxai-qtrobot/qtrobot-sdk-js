@@ -9,7 +9,7 @@ import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { CORE_RPC, CORE_STREAM } from '../src/idl/api_core'
 import { PLUGINS_RPC, PLUGINS_STREAM } from '../src/idl/api_plugins'
-import type { RpcEntry, StreamEntry, ParamDef, FrameClass } from '../src/idl/types'
+import type { RpcEntry, StreamEntry, FrameClass } from '../src/idl/types'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -124,30 +124,6 @@ const FRAME_META: Record<FrameClass, FrameMeta> = {
   },
 }
 
-// ─── Argument helpers ────────────────────────────────────────────────────────
-
-function buildArgsExpr(params: ParamDef[], optMode: 'none' | 'positional' | 'spread'): string {
-  const required = params.filter(p => !p.optional)
-  const optional = params.filter(p => p.optional)
-  if (optMode === 'spread') {
-    const parts = required.map(p => p.name)
-    if (optional.length > 0) parts.push('...options')
-    return `{ ${parts.join(', ')} }`
-  }
-  if (optMode === 'positional') {
-    return `{ ${params.map(p => p.name).join(', ')} }`
-  }
-  return `{ ${required.map(p => p.name).join(', ')} }`
-}
-
-type OptMode = 'none' | 'positional' | 'spread'
-function optMode(params: ParamDef[]): OptMode {
-  const n = params.filter(p => p.optional).length
-  if (n === 0) return 'none'
-  if (n === 1) return 'positional'
-  return 'spread'
-}
-
 // ─── Code generation ─────────────────────────────────────────────────────────
 
 function generateNs(
@@ -157,8 +133,7 @@ function generateNs(
 ): string {
   const className = nsClassName(ns)
 
-  // Collect imports
-  const needsActionHandle = Object.values(rpcs).some(e => e.cancel)
+  const needsWithSignal = Object.values(rpcs).some(e => e.cancel)
   const needsStreamReader = Object.values(streams).some(e => e.direction === 'out')
   const needsStreamWriter = Object.values(streams).some(e => e.direction === 'in')
 
@@ -181,7 +156,7 @@ function generateNs(
   lines.push(`// Edit src/idl/api_core.ts (or api_plugins.ts) and run \`npm run gen\`.`)
   lines.push(``)
   lines.push(`import type { Robot } from '../client'`)
-  if (needsActionHandle) lines.push(`import { ActionHandle } from '../actions'`)
+  if (needsWithSignal) lines.push(`import { withSignal } from '../actions'`)
   if (needsStreamReader || needsStreamWriter) {
     const streamImports: string[] = []
     if (needsStreamReader) streamImports.push('TypedStreamReader')
@@ -200,15 +175,19 @@ function generateNs(
 
   // ── Options types ──────────────────────────────────────────────────────────
   for (const [key, entry] of Object.entries(rpcs)) {
+    if (entry.params.length === 0) continue  // no-param methods don't need an options type
     const methodPart = key.split('.').slice(1).join('.')
-    const mode = optMode(entry.params)
-    if (mode !== 'spread') continue
     const typeName = toPascalCase(ns) + toPascalCase(methodPart) + 'Options'
-    const optParams = entry.params.filter(p => p.optional)
+
     lines.push(`export type ${typeName} = {`)
-    for (const p of optParams) {
+    for (const p of entry.params) {
       lines.push(`  /** ${p.doc} */`)
-      lines.push(`  ${p.name}?: ${idlParamToTs(p.type)}`)
+      const opt = p.optional ? '?' : ''
+      lines.push(`  ${p.name}${opt}: ${idlParamToTs(p.type)}`)
+    }
+    if (entry.cancel) {
+      lines.push(`  /** AbortSignal to cancel the operation. */`)
+      lines.push(`  signal?: AbortSignal`)
     }
     lines.push(`}`)
     lines.push(``)
@@ -223,75 +202,64 @@ function generateNs(
   for (const [key, entry] of Object.entries(rpcs)) {
     const methodPart = key.split('.').slice(1).join('.')
     const methodName = toCamelCase(methodPart)
-    const MethodName = toPascalCase(methodPart)
     const retTs = idlReturnToTs(entry.returns)
-    const required = entry.params.filter(p => !p.optional)
-    const optional = entry.params.filter(p => p.optional)
-    const mode = optMode(entry.params)
-    const optTypeName = toPascalCase(ns) + MethodName + 'Options'
-    const argsExpr = buildArgsExpr(entry.params, mode)
-
-    // Build parameter list for blocking method
-    const paramParts: string[] = []
-    for (const p of required) {
-      paramParts.push(`${p.name}: ${idlParamToTs(p.type)}`)
-    }
-    if (mode === 'spread') {
-      paramParts.push(`options?: ${optTypeName}`)
-    } else if (mode === 'positional') {
-      const op = optional[0]
-      paramParts.push(`${op.name}?: ${idlParamToTs(op.type)}`)
-    }
-    paramParts.push(`timeoutSec?: number`)
-    const paramStr = paramParts.join(', ')
+    const hasParams = entry.params.length > 0
+    const optTypeName = toPascalCase(ns) + toPascalCase(methodPart) + 'Options'
 
     // JSDoc
     lines.push(`  /**`)
     lines.push(`   * ${entry.doc}`)
-    for (const p of required) {
-      lines.push(`   * @param ${p.name} ${p.doc}`)
+    if (hasParams) {
+      for (const p of entry.params) {
+        lines.push(`   * @param options.${p.name} ${p.doc}`)
+      }
+      if (entry.cancel) {
+        lines.push(`   * @param options.signal AbortSignal to cancel the operation.`)
+      }
     }
-    if (mode === 'spread') {
-      lines.push(`   * @param options Optional parameters.`)
-    } else if (mode === 'positional') {
-      const op = optional[0]
-      lines.push(`   * @param ${op.name} ${op.doc}`)
-    }
-    lines.push(`   * @param timeoutSec RPC timeout in seconds.`)
     if (retTs !== 'void') {
       lines.push(`   * @returns ${retTs}`)
     }
     lines.push(`   */`)
 
-    if (retTs === 'void') {
-      lines.push(`  async ${methodName}(${paramStr}): Promise<void> {`)
-      lines.push(`    await this._robot.rpcCall('${entry.service}', ${argsExpr}, timeoutSec)`)
-    } else {
-      lines.push(`  async ${methodName}(${paramStr}): Promise<${retTs}> {`)
-      lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', ${argsExpr}, timeoutSec)`)
-    }
-    lines.push(`  }`)
-    lines.push(``)
-
-    // Async (cancellable) variant
-    if (entry.cancel) {
-      const asyncParamParts: string[] = []
-      for (const p of required) asyncParamParts.push(`${p.name}: ${idlParamToTs(p.type)}`)
-      if (mode === 'spread') asyncParamParts.push(`options?: ${optTypeName}`)
-      else if (mode === 'positional') {
-        const op = optional[0]
-        asyncParamParts.push(`${op.name}?: ${idlParamToTs(op.type)}`)
+    if (!hasParams) {
+      // No-params method — plain, no options object
+      if (retTs === 'void') {
+        lines.push(`  async ${methodName}(): Promise<void> {`)
+        lines.push(`    await this._robot.rpcCall('${entry.service}', {})`)
+      } else {
+        lines.push(`  async ${methodName}(): Promise<${retTs}> {`)
+        lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', {})`)
       }
-      const asyncParamStr = asyncParamParts.join(', ')
-      const asyncRetTs = retTs === 'void' ? 'void' : retTs
-      lines.push(`  /** ${entry.doc} Returns a cancellable handle. */`)
-      lines.push(`  ${methodName}Async(${asyncParamStr}): ActionHandle<${asyncRetTs}> {`)
-      lines.push(`    const result = this._robot.rpcCall<${asyncRetTs}>('${entry.service}', ${argsExpr})`)
-      lines.push(`    const cancel = () => this._robot.rpcCall<void>('${entry.cancel}', {})`)
-      lines.push(`    return new ActionHandle(result, cancel)`)
       lines.push(`  }`)
-      lines.push(``)
+    } else if (!entry.cancel) {
+      // Non-cancellable with params
+      if (retTs === 'void') {
+        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<void> {`)
+        lines.push(`    await this._robot.rpcCall('${entry.service}', options as Record<string, unknown>)`)
+      } else {
+        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
+        lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', options as Record<string, unknown>)`)
+      }
+      lines.push(`  }`)
+    } else {
+      // Cancellable with params — signal goes in options
+      if (retTs === 'void') {
+        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<void> {`)
+        lines.push(`    const { signal, ...args } = options`)
+        lines.push(`    const rpc = this._robot.rpcCall<void>('${entry.service}', args as Record<string, unknown>)`)
+        lines.push(`    if (!signal) { await rpc; return }`)
+        lines.push(`    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('${entry.cancel}', {}))`)
+      } else {
+        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
+        lines.push(`    const { signal, ...args } = options`)
+        lines.push(`    const rpc = this._robot.rpcCall<${retTs}>('${entry.service}', args as Record<string, unknown>)`)
+        lines.push(`    if (!signal) return rpc`)
+        lines.push(`    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('${entry.cancel}', {}))`)
+      }
+      lines.push(`  }`)
     }
+    lines.push(``)
   }
 
   // ── Stream methods ────────────────────────────────────────────────────────
@@ -318,7 +286,7 @@ function generateNs(
       lines.push(`  }`)
       lines.push(``)
 
-      // Reader
+      // Reader with options object
       lines.push(`  /**`)
       lines.push(`   * ${entry.doc}`)
       lines.push(`   *`)
@@ -326,13 +294,13 @@ function generateNs(
       lines.push(`   * for await (const frame of robot.${ns}.${methodName}Reader()) {`)
       lines.push(`   *   // handle frame`)
       lines.push(`   * }`)
-      lines.push(`   * @param queueSize Internal frame buffer size (default: ${entry.queueSize ?? 10}).`)
+      lines.push(`   * @param options.queueSize Internal frame buffer size (default: ${entry.queueSize ?? 10}).`)
       lines.push(`   */`)
-      lines.push(`  ${methodName}Reader(queueSize?: number): TypedStreamReader<${tsType}> {`)
+      lines.push(`  ${methodName}Reader(options?: { queueSize?: number }): TypedStreamReader<${tsType}> {`)
       lines.push(`    return this._robot.getStreamReader<${tsType}>(`)
       lines.push(`      '${entry.topic}',`)
       lines.push(`      ${meta.factory!},`)
-      lines.push(`      queueSize,`)
+      lines.push(`      options?.queueSize,`)
       lines.push(`    )`)
       lines.push(`  }`)
       lines.push(``)

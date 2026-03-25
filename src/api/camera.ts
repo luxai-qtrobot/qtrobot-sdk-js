@@ -10,29 +10,26 @@ export class CameraApi {
 
   /**
    * Get color camera intrinsic parameters (fx, fy, ppx, ppy, width, height, model, coeffs).
-   * @param timeoutSec RPC timeout in seconds.
    * @returns Record<string, unknown>
    */
-  async getColorIntrinsics(timeoutSec?: number): Promise<Record<string, unknown>> {
-    return this._robot.rpcCall<Record<string, unknown>>('/camera/color/intrinsics', {  }, timeoutSec)
+  async getColorIntrinsics(): Promise<Record<string, unknown>> {
+    return this._robot.rpcCall<Record<string, unknown>>('/camera/color/intrinsics', {})
   }
 
   /**
    * Get depth camera intrinsic parameters (fx, fy, ppx, ppy, width, height, model, coeffs).
-   * @param timeoutSec RPC timeout in seconds.
    * @returns Record<string, unknown>
    */
-  async getDepthIntrinsics(timeoutSec?: number): Promise<Record<string, unknown>> {
-    return this._robot.rpcCall<Record<string, unknown>>('/camera/depth/intrinsics', {  }, timeoutSec)
+  async getDepthIntrinsics(): Promise<Record<string, unknown>> {
+    return this._robot.rpcCall<Record<string, unknown>>('/camera/depth/intrinsics', {})
   }
 
   /**
    * Get the depth scale factor (metres per depth unit). Returns { scale: number }.
-   * @param timeoutSec RPC timeout in seconds.
    * @returns Record<string, unknown>
    */
-  async getDepthScale(timeoutSec?: number): Promise<Record<string, unknown>> {
-    return this._robot.rpcCall<Record<string, unknown>>('/camera/depth/scale', {  }, timeoutSec)
+  async getDepthScale(): Promise<Record<string, unknown>> {
+    return this._robot.rpcCall<Record<string, unknown>>('/camera/depth/scale', {})
   }
 
   /**
@@ -55,13 +52,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.colorReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  colorReader(queueSize?: number): TypedStreamReader<ImageFrameRaw> {
+  colorReader(options?: { queueSize?: number }): TypedStreamReader<ImageFrameRaw> {
     return this._robot.getStreamReader<ImageFrameRaw>(
       '/camera/color/image',
       raw => Frame.fromDict(raw as Record<string, unknown>) as ImageFrameRaw,
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -85,13 +82,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.depthReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  depthReader(queueSize?: number): TypedStreamReader<ImageFrameRaw> {
+  depthReader(options?: { queueSize?: number }): TypedStreamReader<ImageFrameRaw> {
     return this._robot.getStreamReader<ImageFrameRaw>(
       '/camera/depth/image',
       raw => Frame.fromDict(raw as Record<string, unknown>) as ImageFrameRaw,
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -115,13 +112,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.depthAlignedReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  depthAlignedReader(queueSize?: number): TypedStreamReader<ImageFrameRaw> {
+  depthAlignedReader(options?: { queueSize?: number }): TypedStreamReader<ImageFrameRaw> {
     return this._robot.getStreamReader<ImageFrameRaw>(
       '/camera/depth/aligned/image',
       raw => Frame.fromDict(raw as Record<string, unknown>) as ImageFrameRaw,
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -145,13 +142,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.depthColorReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  depthColorReader(queueSize?: number): TypedStreamReader<ImageFrameRaw> {
+  depthColorReader(options?: { queueSize?: number }): TypedStreamReader<ImageFrameRaw> {
     return this._robot.getStreamReader<ImageFrameRaw>(
       '/camera/depth/color/image',
       raw => Frame.fromDict(raw as Record<string, unknown>) as ImageFrameRaw,
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -175,13 +172,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.gyroReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  gyroReader(queueSize?: number): TypedStreamReader<unknown[]> {
+  gyroReader(options?: { queueSize?: number }): TypedStreamReader<unknown[]> {
     return this._robot.getStreamReader<unknown[]>(
       '/camera/gyro',
       raw => ((raw as { value?: unknown[] }).value ?? []),
-      queueSize,
+      options?.queueSize,
     )
   }
 
@@ -205,13 +202,13 @@ export class CameraApi {
    * for await (const frame of robot.camera.accelerationReader()) {
    *   // handle frame
    * }
-   * @param queueSize Internal frame buffer size (default: 2).
+   * @param options.queueSize Internal frame buffer size (default: 2).
    */
-  accelerationReader(queueSize?: number): TypedStreamReader<unknown[]> {
+  accelerationReader(options?: { queueSize?: number }): TypedStreamReader<unknown[]> {
     return this._robot.getStreamReader<unknown[]>(
       '/camera/acceleration',
       raw => ((raw as { value?: unknown[] }).value ?? []),
-      queueSize,
+      options?.queueSize,
     )
   }
 

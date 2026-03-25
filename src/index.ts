@@ -1,7 +1,7 @@
 export { Robot } from './client'
 export type { ConnectOptions } from './client'
 
-export { ActionHandle, RobotApiError, ActionCancelledError } from './actions'
+export { RobotApiError, withSignal } from './actions'
 export { TypedStreamReader, TypedStreamWriter } from './streams'
 export { UnsupportedApiError } from './transport'
 
@@ -14,10 +14,11 @@ export { LedColorFrame } from './frames/led'
 export { AudioFrameRaw, AudioFrameFlac, ImageFrameRaw, ImageFrameJpeg } from '@luxai-qtrobot/magpie'
 
 // API namespace types (for use in type annotations)
-export type { TtsSayTextOptions } from './api/tts'
-export type { GesturePlayOptions } from './api/gesture'
-export type { GestureRecordOptions } from './api/gesture'
-export type { MotorSetCalibOptions } from './api/motor'
-export type { MediaPlayFgVideoFileOptions } from './api/media'
-export type { MediaPlayBgVideoFileOptions } from './api/media'
+export type { TtsSayTextOptions, TtsSaySsmlOptions, TtsSetConfigOptions, TtsGetConfigOptions, TtsGetLanguagesOptions, TtsGetVoicesOptions, TtsSupportsSsmlOptions } from './api/tts'
+export type { FaceShowEmotionOptions, FaceLookOptions } from './api/face'
+export type { GesturePlayOptions, GesturePlayFileOptions, GestureRecordOptions, GestureStoreRecordOptions } from './api/gesture'
+export type { MotorOnOptions, MotorOffOptions, MotorHomeOptions, MotorSetVelocityOptions, MotorSetCalibOptions } from './api/motor'
+export type { MicrophoneSetIntTuningOptions } from './api/microphone'
+export type { MediaPlayFgAudioFileOptions, MediaSetFgAudioVolumeOptions, MediaPlayBgAudioFileOptions, MediaSetBgAudioVolumeOptions, MediaPlayFgVideoFileOptions, MediaSetFgVideoAlphaOptions, MediaPlayBgVideoFileOptions } from './api/media'
+export type { SpeakerSetVolumeOptions } from './api/speaker'
 export type { CameraApi } from './api/camera'

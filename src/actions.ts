@@ -5,45 +5,29 @@ export class RobotApiError extends Error {
   }
 }
 
-export class ActionCancelledError extends Error {
-  constructor() {
-    super('Action was cancelled')
-    this.name = 'ActionCancelledError'
+/**
+ * Race `promise` against `signal`. If the signal fires first, rejects with
+ * the signal's reason (or a new `DOMException('Aborted', 'AbortError')`) and
+ * invokes `onAbort` to send a cancel RPC on the remote side.
+ */
+export async function withSignal<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  onAbort?: () => Promise<void>,
+): Promise<T> {
+  if (signal.aborted) {
+    onAbort?.().catch(() => {})
+    throw signal.reason ?? new DOMException('Aborted', 'AbortError')
   }
-}
-
-export class ActionHandle<T = unknown> {
-  private readonly _result: Promise<T>
-  private readonly _cancelFn: (() => Promise<void>) | null
-
-  constructor(result: Promise<T>, cancelFn: (() => Promise<void>) | null = null) {
-    this._result = result
-    this._cancelFn = cancelFn
-  }
-
-  /** Await the action result. Rejects with RobotApiError on failure. */
-  get result(): Promise<T> {
-    return this._result
-  }
-
-  /** Cancel the action. No-op if the action has no cancel service. */
-  async cancel(): Promise<void> {
-    if (this._cancelFn) await this._cancelFn()
-  }
-
-  /** Allow ActionHandle to be used directly with await. */
-  then<R>(
-    onFulfilled: (value: T) => R | PromiseLike<R>,
-    onRejected?: (reason: unknown) => R | PromiseLike<R>,
-  ): Promise<R> {
-    return this._result.then(onFulfilled, onRejected)
-  }
-
-  catch<R>(onRejected: (reason: unknown) => R | PromiseLike<R>): Promise<T | R> {
-    return this._result.catch(onRejected)
-  }
-
-  finally(onFinally?: () => void): Promise<T> {
-    return this._result.finally(onFinally)
-  }
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      onAbort?.().catch(() => {})
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    promise.then(
+      val => { signal.removeEventListener('abort', abort); resolve(val) },
+      err => { signal.removeEventListener('abort', abort); reject(err) },
+    )
+  })
 }
