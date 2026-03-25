@@ -12,7 +12,7 @@ const BROKER_URL = 'mqtt://192.168.3.152:1883'
 const ROBOT_ID   = 'QTRD000320'
 
 async function main() {
-  const robot = await Robot.connect(BROKER_URL, ROBOT_ID)
+  const robot = await Robot.connectMqtt(BROKER_URL, ROBOT_ID)
 
   // ---- 1. List motors ----
   const motors = await robot.motor.list()
@@ -57,6 +57,11 @@ async function main() {
   await writer.write(cmd)
   Logger.info('Command sent.')
   writer.close()
+
+  // ---- 6. Home all motors ----
+  Logger.info('Homing all motors...')
+  await robot.motor.homeAll()
+  Logger.info('All motors homed.')
 
   robot.close()
 }

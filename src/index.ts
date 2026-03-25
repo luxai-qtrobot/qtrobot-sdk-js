@@ -3,7 +3,7 @@ export type { ConnectOptions } from './client'
 
 export { RobotApiError, withSignal } from './actions'
 export { TypedStreamReader, TypedStreamWriter } from './streams'
-export { UnsupportedApiError } from './transport'
+export { Transport, MqttTransport, UnsupportedApiError } from './transport'
 
 // Frame types
 export { JointStateFrame } from './frames/joint_state'

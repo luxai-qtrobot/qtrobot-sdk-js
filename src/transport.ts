@@ -3,14 +3,12 @@ import {
   MqttRpcRequester,
   MqttSubscriber,
   MqttPublisher,
+  RpcRequester,
+  StreamReader,
+  StreamWriter,
 } from '@luxai-qtrobot/magpie'
 
 import type { MqttOptions } from '@luxai-qtrobot/magpie'
-
-export type RouteMeta = {
-  mqtt: { topic: string; qos?: number }
-  direction?: 'in' | 'out'
-}
 
 export type SystemDescription = {
   robot_type?: string
@@ -29,18 +27,49 @@ export class UnsupportedApiError extends Error {
   }
 }
 
-export class MqttTransport {
+/**
+ * Abstract transport base class.
+ *
+ * Robot is transport-agnostic — it only talks to this interface.
+ * Extend this class to implement alternative transports (ZMQ, WebSocket, local, etc.).
+ *
+ * @example
+ * class MyTransport extends Transport {
+ *   // implement getRequester, getSubscriber, getPublisher, handshake, close
+ * }
+ * const robot = await Robot.connect(new MyTransport(...))
+ */
+export abstract class Transport {
+  abstract readonly robotId: string
+
+  /** Perform the system-describe handshake and return the robot's capability description. */
+  abstract handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription>
+
+  /** Return an RPC requester for the given resolved topic/address. */
+  abstract getRequester(topic: string): RpcRequester
+
+  /** Return a stream reader (subscriber) for the given resolved topic/address. */
+  abstract getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader
+
+  /** Return a stream writer (publisher). */
+  abstract getPublisher(): StreamWriter
+
+  /** Close all resources held by this transport. */
+  abstract close(): void
+}
+
+// ─── MQTT transport ──────────────────────────────────────────────────────────
+
+export class MqttTransport extends Transport {
   private _requesters = new Map<string, MqttRpcRequester>()
 
   constructor(
     private readonly _conn: MqttConnection,
     readonly robotId: string,
-  ) {}
+  ) {
+    super()
+  }
 
-  /**
-   * Issue the system describe RPC handshake and return the parsed description.
-   * The describe endpoint uses the robot_id topic directly (no service path prefix).
-   */
   async handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription> {
     const requester = this._getOrCreateRequester(this.robotId)
     const raw = await requester.call({ sdk_version: sdkVersion }, timeoutSec) as {
@@ -51,15 +80,15 @@ export class MqttTransport {
     return raw.response
   }
 
-  getRequester(mqttTopic: string): MqttRpcRequester {
-    return this._getOrCreateRequester(mqttTopic)
+  getRequester(topic: string): RpcRequester {
+    return this._getOrCreateRequester(topic)
   }
 
-  getSubscriber(mqttTopic: string, qos?: number, queueSize?: number): MqttSubscriber {
-    return new MqttSubscriber(this._conn, { topic: mqttTopic, qos: qos as 0 | 1 | 2 | undefined, queueSize })
+  getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader {
+    return new MqttSubscriber(this._conn, { topic, qos: qos as 0 | 1 | 2 | undefined, queueSize })
   }
 
-  getPublisher(): MqttPublisher {
+  getPublisher(): StreamWriter {
     return new MqttPublisher(this._conn)
   }
 

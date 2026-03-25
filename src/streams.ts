@@ -1,4 +1,4 @@
-import { MqttSubscriber, MqttPublisher, TimeoutError } from '@luxai-qtrobot/magpie'
+import { StreamReader, StreamWriter, TimeoutError } from '@luxai-qtrobot/magpie'
 
 export type FrameFactory<T> = (raw: unknown) => T
 export type FrameSerializer<T> = (frame: T) => unknown
@@ -8,7 +8,7 @@ export class TypedStreamReader<T> {
   private _loopRunning = false
 
   constructor(
-    private readonly _subscriber: MqttSubscriber,
+    private readonly _reader: StreamReader,
     private readonly _factory: FrameFactory<T>,
   ) {}
 
@@ -26,7 +26,7 @@ export class TypedStreamReader<T> {
    * @param timeoutSec Seconds to wait before throwing TimeoutError (default: no timeout)
    */
   async read(timeoutSec?: number): Promise<T> {
-    const [raw] = await this._subscriber.read(timeoutSec)
+    const [raw] = await this._reader.read(timeoutSec)
     return this._factory(raw)
   }
 
@@ -44,7 +44,7 @@ export class TypedStreamReader<T> {
 
   close(): void {
     this._closed = true
-    this._subscriber.close()
+    this._reader.close()
   }
 
   private _startLoop(handler: (frame: T) => void, onError?: (err: Error) => void): void {
@@ -71,18 +71,18 @@ export class TypedStreamWriter<T> {
   private _closed = false
 
   constructor(
-    private readonly _publisher: MqttPublisher,
+    private readonly _writer: StreamWriter,
     private readonly _topic: string,
     private readonly _serializer: FrameSerializer<T>,
   ) {}
 
   async write(frame: T): Promise<void> {
     if (this._closed) return
-    await this._publisher.write(this._serializer(frame), this._topic)
+    await this._writer.write(this._serializer(frame), this._topic)
   }
 
   close(): void {
     this._closed = true
-    this._publisher.close()
+    this._writer.close()
   }
 }

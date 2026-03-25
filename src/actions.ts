@@ -1,3 +1,5 @@
+import { Logger } from '@luxai-qtrobot/magpie'
+
 export class RobotApiError extends Error {
   constructor(message: string) {
     super(message)
@@ -16,13 +18,16 @@ export async function withSignal<T>(
   onAbort?: () => Promise<void>,
 ): Promise<T> {
   if (signal.aborted) {
-    onAbort?.().catch(() => {})
+    await onAbort?.().catch(e => Logger.warning(`withSignal: cancel RPC failed: ${e}`))
     throw signal.reason ?? new DOMException('Aborted', 'AbortError')
   }
   return new Promise<T>((resolve, reject) => {
     const abort = () => {
-      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
-      onAbort?.().catch(() => {})
+      const error = signal.reason ?? new DOMException('Aborted', 'AbortError')
+      // Wait for the cancel RPC to complete before unblocking the caller.
+      // This ensures the cancel command reaches the robot before the caller's
+      // await chain continues and potentially closes the transport.
+      ;(onAbort?.().catch(e => Logger.warning(`withSignal: cancel RPC failed: ${e}`)) ?? Promise.resolve()).then(() => reject(error))
     }
     signal.addEventListener('abort', abort, { once: true })
     promise.then(

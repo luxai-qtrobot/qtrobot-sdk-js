@@ -41,7 +41,12 @@
     "example:connect": "tsx examples/connect_mqtt.ts",
     "example:tts": "tsx examples/tts_example.ts",
     "example:motor": "tsx examples/motor_example.ts",
-    "example:microphone": "tsx examples/microphone_example.ts"
+    "example:microphone": "tsx examples/microphone_example.ts",
+    "example:face": "tsx examples/face_example.ts",
+    "example:gesture": "tsx examples/gesture_example.ts",
+    "example:speaker": "tsx examples/speaker_example.ts",
+    "example:media:audio": "tsx examples/media_audio_example.ts",
+    "example:media:video": "tsx examples/media_video_example.ts"
   },
   "dependencies": {
     "@luxai-qtrobot/magpie": "^0.2.1"
