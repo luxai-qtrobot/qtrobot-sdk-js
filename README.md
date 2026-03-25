@@ -29,8 +29,7 @@ A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) ro
   - [Media — Video](#media--video)
   - [Speaker](#speaker)
   - [Microphone](#microphone)
-- [Plugin System](#plugin-system)
-  - [Camera (RealSense)](#camera-realsense)
+- [Plugin System](#plugin-system)  
 - [Examples](#examples)
 - [License](#license)
 
@@ -764,56 +763,6 @@ await robot.enablePluginMqtt('camera', 'mqtt://192.168.1.100:1883', 'QTRD000320/
 await robot.enablePlugin('camera', new MyCustomTransport(...))
 
 // Disable and disconnect a plugin
-robot.disablePlugin('camera')
-```
-
----
-
-### Camera (RealSense)
-
-Requires the `qtrobot-realsense` node running on the robot or a separate host.
-
-```typescript
-await robot.enablePluginMqtt('camera', 'mqtt://192.168.1.100:1883', 'QTRD000320/realsense')
-const cam = robot.camera!
-```
-
-**RPC methods:**
-
-| Method | Returns | Description |
-|---|---|---|
-| `cam.getColorIntrinsics()` | `object` | RGB camera intrinsic parameters (`fx, fy, cx, cy, width, height`) |
-| `cam.getDepthIntrinsics()` | `object` | Depth camera intrinsic parameters |
-| `cam.getDepthScale()` | `number` | Depth scale factor (metres per depth unit) |
-
-**Stream methods:**
-
-| Method | Frame type | Description |
-|---|---|---|
-| `cam.onColorImage(handler, onError?)` | `ImageFrameJpeg` | Subscribe to colour frames |
-| `cam.colorImageReader(options?)` | `ImageFrameJpeg` | Async-iterable colour frame reader |
-| `cam.onDepthImage(handler, onError?)` | `ImageFrameRaw` | Subscribe to depth frames |
-| `cam.onGyro(handler, onError?)` | `object` | Subscribe to IMU gyroscope data |
-| `cam.onAcceleration(handler, onError?)` | `object` | Subscribe to IMU accelerometer data |
-
-**Example:**
-
-```typescript
-import { ImageFrameJpeg } from '@luxai-qtrobot/robot-sdk'
-
-await robot.enablePluginMqtt('camera', 'mqtt://192.168.1.100:1883', 'QTRD000320/realsense')
-const cam = robot.camera!
-
-const intrinsics = await cam.getColorIntrinsics()
-console.log(`Resolution: ${intrinsics['width']}×${intrinsics['height']}`)
-console.log(`Depth scale: ${await cam.getDepthScale()} m/unit`)
-
-// Capture one colour frame
-const reader = cam.colorImageReader()
-const frame = await reader.read(5.0)
-console.log(`Got JPEG frame: ${frame.data.byteLength} bytes`)
-reader.close()
-
 robot.disablePlugin('camera')
 ```
 
