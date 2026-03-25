@@ -1,0 +1,47 @@
+{
+  "name": "@luxai-qtrobot/robot-sdk",
+  "version": "0.1.0",
+  "description": "QTrobot SDK for TypeScript/JavaScript — connect and control QTrobot over MQTT",
+  "keywords": ["qtrobot", "robot", "mqtt", "sdk", "luxai", "robotics"],
+  "author": "LuxAI S.A.",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luxai-qtrobot/qtrobot-sdk-js.git"
+  },
+  "homepage": "https://github.com/luxai-qtrobot/qtrobot-sdk-js#readme",
+  "bugs": {
+    "url": "https://github.com/luxai-qtrobot/qtrobot-sdk-js/issues"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "gen": "tsx scripts/gen_api.ts",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "example:connect": "tsx examples/connect_mqtt.ts",
+    "example:tts": "tsx examples/tts_example.ts",
+    "example:motor": "tsx examples/motor_example.ts",
+    "example:microphone": "tsx examples/microphone_example.ts"
+  },
+  "dependencies": {
+    "@luxai-qtrobot/magpie": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

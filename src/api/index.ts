@@ -1,0 +1,8 @@
+export { CameraApi } from './camera'
+export { FaceApi } from './face'
+export { GestureApi } from './gesture'
+export { MediaApi } from './media'
+export { MicrophoneApi } from './microphone'
+export { MotorApi } from './motor'
+export { SpeakerApi } from './speaker'
+export { TtsApi } from './tts'
