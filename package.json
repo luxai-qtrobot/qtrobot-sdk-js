@@ -49,7 +49,7 @@
     "example:media:video": "tsx examples/media_video_example.ts"
   },
   "dependencies": {
-    "@luxai-qtrobot/magpie": "^0.2.1"
+    "@luxai-qtrobot/magpie": "file:../magpie-js"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

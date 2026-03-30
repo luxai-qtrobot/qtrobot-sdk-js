@@ -1,9 +1,13 @@
 export { Robot } from './client'
-export type { ConnectOptions } from './client'
+export type { ConnectOptions, ConnectWebrtcMqttOptions } from './client'
 
 export { RobotApiError, withSignal } from './actions'
 export { TypedStreamReader, TypedStreamWriter } from './streams'
-export { Transport, MqttTransport, UnsupportedApiError } from './transport'
+export { Transport, MqttTransport, WebRtcTransport, UnsupportedApiError } from './transport'
+export type { WebRtcSignalingParams } from './transport'
+
+// Re-export WebRTC option types for users building custom transports
+export type { WebRtcOptions, WebRtcTurnServer } from '@luxai-qtrobot/magpie'
 
 // Frame types
 export { JointStateFrame } from './frames/joint_state'
