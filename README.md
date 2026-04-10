@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 
-A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) robots. It provides a clean, transport-agnostic API for controlling robot hardware — speech synthesis, face animations, gestures, motors, audio/video playback, camera, and microphone — from any Node.js or browser environment over MQTT.
+A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) robots. It provides a clean, transport-agnostic API for controlling robot hardware — speech synthesis, face animations, gestures, motors, audio/video playback, camera, and microphone — from any Node.js or browser environment over MQTT or WebRTC.
 
 > **Primary target:** QTrobot v3 (`QTRD` series). The SDK is designed to be robot-agnostic; future robot models can be supported by extending the API definitions.
 
@@ -15,6 +15,7 @@ A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) ro
 - [Installation](#installation)
 - [Connecting to the Robot](#connecting-to-the-robot)
   - [MQTT transport](#mqtt-transport)
+  - [WebRTC transport](#webrtc-transport)
   - [Custom transport](#custom-transport)
 - [API Concepts](#api-concepts)
   - [Awaiting RPC calls](#awaiting-rpc-calls)
@@ -91,6 +92,26 @@ await using robot = await Robot.connectMqtt('mqtt://192.168.1.100:1883', 'QTRD00
 await robot.tts.sayText({ text: 'Hello!' })
 // robot.close() is called automatically when the block exits
 ```
+
+---
+
+### WebRTC transport
+
+Connects to the robot over a peer-to-peer WebRTC data channel, using MQTT only for signaling (SDP/ICE exchange). Once the data channel is open, all RPC traffic flows directly over WebRTC — no broker in the loop. This transport is ideal for browser environments with low-latency requirements or restricted MQTT access.
+
+```typescript
+import { Robot } from '@luxai-qtrobot/robot-sdk'
+
+// broker URL is the MQTT WebSocket endpoint used only for signaling
+const robot = await Robot.connectWebrtcMqtt('ws://192.168.1.100:9001', 'QTRD000320', {
+  connectTimeoutSec: 30,
+})
+
+console.log(`Connected to ${robot.robotId} (${robot.robotType})`)
+robot.close()
+```
+
+> **Note:** The API is identical to MQTT — just swap `connectMqtt` for `connectWebrtcMqtt`. WebRTC negotiation can take up to ~10 seconds, so use a higher `connectTimeoutSec` than the MQTT default.
 
 ---
 
@@ -787,6 +808,20 @@ npm run example:<name>
 | `example:media:audio` | [`media_audio_example.ts`](examples/media_audio_example.ts) | Volume control, FG/BG file playback, pause/resume, cancel, online audio |
 | `example:media:video` | [`media_video_example.ts`](examples/media_video_example.ts) | BG video file playback, pause/resume, FG alpha transparency, cancel |
 | `example:speaker` | [`speaker_example.ts`](examples/speaker_example.ts) | Get/set master volume, mute/unmute |
+
+### Web browser examples
+
+Interactive HTML pages in [`examples/web/`](examples/web/). Each feature has two variants — **MQTT** (direct broker connection) and **WebRTC** (P2P data channel, MQTT only for signaling). Open the files directly in a browser after building the SDK (`npm run build`).
+
+| Feature | MQTT | WebRTC | Demonstrates |
+|---|---|---|---|
+| Face | [`mqtt/face.html`](examples/web/mqtt/face.html) | [`webrtc/face.html`](examples/web/webrtc/face.html) | List emotions, play with speed control + cancel, eye gaze |
+| Gesture | [`mqtt/gesture.html`](examples/web/mqtt/gesture.html) | [`webrtc/gesture.html`](examples/web/webrtc/gesture.html) | List gestures, play with speed factor + cancel |
+| Motor | [`mqtt/motor.html`](examples/web/mqtt/motor.html) | [`webrtc/motor.html`](examples/web/webrtc/motor.html) | Live joint state table, direct joint position/velocity commands |
+| TTS | [`mqtt/tts.html`](examples/web/mqtt/tts.html) | [`webrtc/tts.html`](examples/web/webrtc/tts.html) | Speak text with engine/voice/rate/pitch, cancel; engine info |
+| Speaker | [`mqtt/speaker.html`](examples/web/mqtt/speaker.html) | [`webrtc/speaker.html`](examples/web/webrtc/speaker.html) | Master volume slider, mute/unmute |
+| Audio | [`mqtt/audio.html`](examples/web/mqtt/audio.html) | [`webrtc/audio.html`](examples/web/webrtc/audio.html) | FG/BG file and stream playback, per-lane volume, pause/resume/cancel |
+| Video | [`mqtt/video.html`](examples/web/mqtt/video.html) | [`webrtc/video.html`](examples/web/webrtc/video.html) | FG/BG video file playback, FG alpha slider, pause/resume/cancel |
 
 ---
 

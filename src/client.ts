@@ -1,5 +1,5 @@
-import type { MqttOptions } from '@luxai-qtrobot/magpie'
-import { Transport, MqttTransport, SystemDescription, UnsupportedApiError } from './transport'
+import type { MqttOptions, WebRtcOptions } from '@luxai-qtrobot/magpie'
+import { Transport, MqttTransport, WebRtcTransport, WebRtcSignalingParams, SystemDescription, UnsupportedApiError } from './transport'
 import { TypedStreamReader, TypedStreamWriter, FrameFactory, FrameSerializer } from './streams'
 import { RobotApiError } from './actions'
 import { TtsApi } from './api/tts'
@@ -14,6 +14,14 @@ import { CameraApi } from './api/camera'
 const SDK_VERSION = '0.1.0'
 
 export type ConnectOptions = MqttOptions & {
+  connectTimeoutSec?: number
+  defaultRpcTimeoutSec?: number
+}
+
+export type ConnectWebrtcMqttOptions = {
+  mqttOptions?: MqttOptions
+  webrtcOptions?: WebRtcOptions
+  reconnect?: boolean
   connectTimeoutSec?: number
   defaultRpcTimeoutSec?: number
 }
@@ -127,6 +135,41 @@ export class Robot {
     }
   }
 
+  /**
+   * Connect to a QTrobot via WebRTC with MQTT signaling.
+   *
+   * Each call establishes an independent WebRTC peer connection.  The
+   * signaling parameters are stored on the transport so that plugin peers
+   * created with {@link enablePluginWebrtcMqtt} can inherit them automatically.
+   *
+   * @param brokerUrl  MQTT broker URI used for WebRTC signaling,
+   *                   e.g. `wss://broker:8884/mqtt`
+   * @param robotId    Robot identifier (used as WebRTC `session_id`), e.g. `"QTRD000320"`
+   * @param options    Optional MQTT/WebRTC/ICE options and SDK defaults
+   *
+   * @example
+   * const robot = await Robot.connectWebrtcMqtt('wss://broker:8884/mqtt', 'QTRD000320')
+   * await robot.tts.sayText({ text: 'Hello!' })
+   * robot.close()
+   */
+  static async connectWebrtcMqtt(brokerUrl: string, robotId: string, options?: ConnectWebrtcMqttOptions): Promise<Robot> {
+    const connectTimeoutSec = options?.connectTimeoutSec ?? 30
+    const signalingParams: WebRtcSignalingParams = {
+      brokerUrl,
+      mqttOptions: options?.mqttOptions,
+      webrtcOptions: options?.webrtcOptions,
+      reconnect: options?.reconnect ?? false,
+      connectTimeoutSec,
+    }
+    const transport = await WebRtcTransport.create(brokerUrl, robotId, signalingParams)
+    try {
+      return await Robot.connect(transport, { connectTimeoutSec, defaultRpcTimeoutSec: options?.defaultRpcTimeoutSec })
+    } catch (err) {
+      transport.close()
+      throw err
+    }
+  }
+
   // ─── RPC call (transport-aware) ───────────────────────────────────────────
 
   /**
@@ -149,7 +192,8 @@ export class Robot {
 
     // Strip undefined values so the wire dict stays clean
     const filteredArgs = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined))
-    const raw = await requester.call(filteredArgs, timeout) as { status: boolean; response: T }
+    const rpcReq = { name: serviceName, args: filteredArgs }
+    const raw = await requester.call(rpcReq, timeout) as { status: boolean; response: T }
 
     if (!raw?.status) {
       throw new RobotApiError(`Service '${serviceName}' returned status=false`)
@@ -257,6 +301,60 @@ export class Robot {
     }
   }
 
+  /**
+   * Connect to a remote plugin node via WebRTC (MQTT signaling) and attach its API namespace.
+   *
+   * Signaling parameters (`brokerUrl`, `mqttOptions`, `webrtcOptions`, `reconnect`,
+   * `connectTimeoutSec`) are optional — if omitted they are inherited from the robot's own
+   * WebRTC connection.  Pass explicit values to target a different broker or gateway.
+   *
+   * Each plugin gets its own independent WebRTC peer connection so that media tracks
+   * never conflict with the robot peer.
+   *
+   * **Requires** that the robot was connected with {@link connectWebrtcMqtt}.
+   *
+   * @param name      Plugin identifier (`"camera"`)
+   * @param nodeId    Plugin's WebRTC `session_id` (e.g. `"qtrobot-realsense-driver"`)
+   * @param options   Optional overrides; falls back to the robot transport's signaling params
+   *
+   * @example
+   * // Inherits broker + options from robot connection automatically
+   * await robot.enablePluginWebrtcMqtt('camera', 'qtrobot-realsense-driver')
+   * const intrinsics = await robot.camera!.getColorIntrinsics()
+   */
+  async enablePluginWebrtcMqtt(
+    name: 'camera',
+    nodeId: string,
+    options?: {
+      brokerUrl?: string
+      mqttOptions?: MqttOptions
+      webrtcOptions?: WebRtcOptions
+      reconnect?: boolean
+      connectTimeoutSec?: number
+    },
+  ): Promise<void> {
+    if (!(this._transport instanceof WebRtcTransport)) {
+      throw new Error(
+        'enablePluginWebrtcMqtt requires a WebRTC robot connection — use Robot.connectWebrtcMqtt()',
+      )
+    }
+    const inherited = this._transport.signalingParams
+    const signalingParams: WebRtcSignalingParams = {
+      brokerUrl:        options?.brokerUrl        ?? inherited.brokerUrl,
+      mqttOptions:      options?.mqttOptions       ?? inherited.mqttOptions,
+      webrtcOptions:    options?.webrtcOptions     ?? inherited.webrtcOptions,
+      reconnect:        options?.reconnect         ?? inherited.reconnect,
+      connectTimeoutSec: options?.connectTimeoutSec ?? inherited.connectTimeoutSec,
+    }
+    const transport = await WebRtcTransport.create(signalingParams.brokerUrl, nodeId, signalingParams)
+    try {
+      await this.enablePlugin(name, transport, { connectTimeoutSec: signalingParams.connectTimeoutSec })
+    } catch (err) {
+      transport.close()
+      throw err
+    }
+  }
+
   /** Disconnect and remove a plugin. */
   disablePlugin(name: 'camera'): void {
     const transport = this._pluginTransports.get(name)
@@ -281,15 +379,18 @@ export class Robot {
   // ─── Internal helpers ─────────────────────────────────────────────────────
 
   private _applyDescription(transport: Transport, desc: SystemDescription): void {
+    const key = transport.transportKey
     for (const [service, meta] of Object.entries(desc.rpc ?? {})) {
-      const mqtt = meta.transports?.mqtt
-      if (mqtt?.topic) this._rpcRoutes.set(service, { transport, topic: mqtt.topic })
+      const t = meta.transports?.[key]
+      const addr = t?.topic ?? t?.service
+      if (addr) this._rpcRoutes.set(service, { transport, topic: addr })
     }
     for (const [topic, meta] of Object.entries(desc.stream ?? {})) {
-      const m = meta as { direction?: string; transports?: { mqtt?: { topic: string; qos?: number } } }
-      const mqtt = m.transports?.mqtt
+      const m = meta as { direction?: string; transports?: Record<string, { topic?: string; service?: string; qos?: number }> }
+      const t = m.transports?.[key]
+      const addr = t?.topic ?? t?.service
       const direction = m.direction as 'in' | 'out' | undefined
-      if (mqtt?.topic) this._streamRoutes.set(topic, { transport, topic: mqtt.topic, qos: mqtt.qos, direction })
+      if (addr) this._streamRoutes.set(topic, { transport, topic: addr, qos: t?.qos, direction })
     }
   }
 }

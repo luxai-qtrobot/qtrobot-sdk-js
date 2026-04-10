@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Audio (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .volume-row input[type="range"] {
+      flex: 1;
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+    .volume-label {
+      font-size: .85rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      min-width: 40px;
+      text-align: right;
+    }
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #e2e8f0;
+      font-size: .88rem;
+    }
+    select:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Audio (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID / Session ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<div class="grid">
+
+  <!-- ── Foreground audio ── -->
+  <div class="card">
+    <h2>Foreground Audio</h2>
+    <p class="hint">Plays in the foreground lane. Supports pause, resume and cancel.</p>
+    <div>
+      <label>URI (file path or http/https URL)</label>
+      <input id="fg-uri" type="text" value="/home/qtrobot/robot/data/audios/QT/John_Wesley_Tequila.mp3" />
+    </div>
+    <div class="volume-row">
+      <label style="margin:0;white-space:nowrap">Volume</label>
+      <input id="fg-vol-slider" type="range" min="0" max="100" value="80"
+        disabled oninput="onFgVolInput()" onchange="onFgVolChange()" />
+      <span id="fg-vol-label" class="volume-label">80%</span>
+    </div>
+    <div class="row">
+      <button id="fg-btn-play"   class="success" disabled onclick="toggleFg()">Play</button>
+      <button id="fg-btn-pause"  class="warn"    disabled onclick="toggleFgPause()">Pause</button>
+      <button id="fg-btn-cancel" class="danger"  disabled onclick="cancelFg()">Cancel</button>
+    </div>
+    <div id="fg-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Background audio ── -->
+  <div class="card">
+    <h2>Background Audio</h2>
+    <p class="hint">Plays in the background lane simultaneously with foreground.</p>
+    <div>
+      <label>URI (file path or http/https URL)</label>
+      <input id="bg-uri" type="text" value="https://stream.radio-calico.com/calico" />
+    </div>
+    <div class="volume-row">
+      <label style="margin:0;white-space:nowrap">Volume</label>
+      <input id="bg-vol-slider" type="range" min="0" max="100" value="50"
+        disabled oninput="onBgVolInput()" onchange="onBgVolChange()" />
+      <span id="bg-vol-label" class="volume-label">50%</span>
+    </div>
+    <div class="row">
+      <button id="bg-btn-play"   class="success" disabled onclick="toggleBg()">Play</button>
+      <button id="bg-btn-pause"  class="warn"    disabled onclick="toggleBgPause()">Pause</button>
+      <button id="bg-btn-cancel" class="danger"  disabled onclick="cancelBg()">Cancel</button>
+    </div>
+    <div id="bg-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot        = null
+  let fgController = null
+  let bgController = null
+  let fgPaused     = false
+  let bgPaused     = false
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(logId, msg, isErr = false) {
+    const el = document.getElementById(logId)
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot      = document.getElementById('status-dot')
+    const text     = document.getElementById('status-text')
+    const btn      = document.getElementById('btn-connect')
+    const controls = [
+      'fg-btn-play','fg-btn-pause','fg-btn-cancel','fg-vol-slider',
+      'bg-btn-play','bg-btn-pause','bg-btn-cancel','bg-vol-slider',
+    ]
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  // ── Connect / disconnect ───────────────────────────────────────────────────
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+      // Fetch current volumes
+      const fgVol = await robot.media.getFgAudioVolume().catch(() => 0.8)
+      const bgVol = await robot.media.getBgAudioVolume().catch(() => 0.5)
+      setSlider('fg', Math.round(fgVol * 100))
+      setSlider('bg', Math.round(bgVol * 100))
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    fgController?.abort(); fgController = null
+    bgController?.abort(); bgController = null
+    robot?.close(); robot = null
+    setStatus('disconnected')
+  }
+
+  // ── Volume sliders ─────────────────────────────────────────────────────────
+
+  function setSlider(lane, pct) {
+    document.getElementById(`${lane}-vol-slider`).value = pct
+    document.getElementById(`${lane}-vol-label`).textContent = `${pct}%`
+  }
+
+  function onFgVolInput() {
+    const pct = parseInt(document.getElementById('fg-vol-slider').value)
+    document.getElementById('fg-vol-label').textContent = `${pct}%`
+  }
+  async function onFgVolChange() {
+    const pct = parseInt(document.getElementById('fg-vol-slider').value)
+    try { await robot.media.setFgAudioVolume({ value: pct / 100 }); log('fg-log', `FG volume: ${pct}%`) }
+    catch (err) { log('fg-log', `Error: ${err.message}`, true) }
+  }
+
+  function onBgVolInput() {
+    const pct = parseInt(document.getElementById('bg-vol-slider').value)
+    document.getElementById('bg-vol-label').textContent = `${pct}%`
+  }
+  async function onBgVolChange() {
+    const pct = parseInt(document.getElementById('bg-vol-slider').value)
+    try { await robot.media.setBgAudioVolume({ value: pct / 100 }); log('bg-log', `BG volume: ${pct}%`) }
+    catch (err) { log('bg-log', `Error: ${err.message}`, true) }
+  }
+
+  // ── Foreground playback ────────────────────────────────────────────────────
+
+  async function toggleFg() {
+    if (fgController) { cancelFg(); return }
+
+    const uri = document.getElementById('fg-uri').value.trim()
+    if (!uri) { alert('Enter a URI.'); return }
+
+    fgController = new AbortController()
+    fgPaused = false
+    document.getElementById('fg-btn-play').textContent = 'Stop'
+    document.getElementById('fg-btn-play').className   = 'danger'
+    document.getElementById('fg-btn-pause').textContent = 'Pause'
+    log('fg-log', `Playing FG: ${uri}`)
+
+    try {
+      const ok = await robot.media.playFgAudioFile({ uri, signal: fgController.signal })
+      if (ok === false) log('fg-log', 'FG: file not found or playback failed.', true)
+      else log('fg-log', 'FG: done.')
+    } catch (err) {
+      if (err.name === 'AbortError' || err.message?.includes('cancel')) log('fg-log', 'FG: cancelled.')
+      else log('fg-log', `FG error: ${err.message}`, true)
+    } finally {
+      fgController = null
+      fgPaused = false
+      document.getElementById('fg-btn-play').textContent = 'Play'
+      document.getElementById('fg-btn-play').className   = 'success'
+      document.getElementById('fg-btn-pause').textContent = 'Pause'
+    }
+  }
+
+  async function toggleFgPause() {
+    if (!fgController) return
+    try {
+      if (!fgPaused) {
+        await robot.media.pauseFgAudioFile()
+        fgPaused = true
+        document.getElementById('fg-btn-pause').textContent = 'Resume'
+        log('fg-log', 'FG: paused.')
+      } else {
+        await robot.media.resumeFgAudioFile()
+        fgPaused = false
+        document.getElementById('fg-btn-pause').textContent = 'Pause'
+        log('fg-log', 'FG: resumed.')
+      }
+    } catch (err) { log('fg-log', `Error: ${err.message}`, true) }
+  }
+
+  function cancelFg() {
+    if (fgController) { fgController.abort(); fgController = null }
+  }
+
+  // ── Background playback ────────────────────────────────────────────────────
+
+  async function toggleBg() {
+    if (bgController) { cancelBg(); return }
+
+    const uri = document.getElementById('bg-uri').value.trim()
+    if (!uri) { alert('Enter a URI.'); return }
+
+    bgController = new AbortController()
+    bgPaused = false
+    document.getElementById('bg-btn-play').textContent = 'Stop'
+    document.getElementById('bg-btn-play').className   = 'danger'
+    document.getElementById('bg-btn-pause').textContent = 'Pause'
+    log('bg-log', `Playing BG: ${uri}`)
+
+    try {
+      const ok = await robot.media.playBgAudioFile({ uri, signal: bgController.signal })
+      if (ok === false) log('bg-log', 'BG: file not found or playback failed.', true)
+      else log('bg-log', 'BG: done.')
+    } catch (err) {
+      if (err.name === 'AbortError' || err.message?.includes('cancel')) log('bg-log', 'BG: cancelled.')
+      else log('bg-log', `BG error: ${err.message}`, true)
+    } finally {
+      bgController = null
+      bgPaused = false
+      document.getElementById('bg-btn-play').textContent = 'Play'
+      document.getElementById('bg-btn-play').className   = 'success'
+      document.getElementById('bg-btn-pause').textContent = 'Pause'
+    }
+  }
+
+  async function toggleBgPause() {
+    if (!bgController) return
+    try {
+      if (!bgPaused) {
+        await robot.media.pauseBgAudioFile()
+        bgPaused = true
+        document.getElementById('bg-btn-pause').textContent = 'Resume'
+        log('bg-log', 'BG: paused.')
+      } else {
+        await robot.media.resumeBgAudioFile()
+        bgPaused = false
+        document.getElementById('bg-btn-pause').textContent = 'Pause'
+        log('bg-log', 'BG: resumed.')
+      }
+    } catch (err) { log('bg-log', `Error: ${err.message}`, true) }
+  }
+
+  function cancelBg() {
+    if (bgController) { bgController.abort(); bgController = null }
+  }
+</script>
+</body>
+</html>

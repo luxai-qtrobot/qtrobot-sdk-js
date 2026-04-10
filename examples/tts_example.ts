@@ -8,7 +8,7 @@
 import { Robot } from '../src'
 import { Logger } from '@luxai-qtrobot/magpie'
 
-const BROKER_URL = 'mqtt://192.168.3.152:1883'
+const BROKER_URL = 'mqtt://10.231.0.2:1883'
 const ROBOT_ID   = 'QTRD000320'
 
 async function listEngines(robot: Robot) {

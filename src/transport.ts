@@ -3,12 +3,16 @@ import {
   MqttRpcRequester,
   MqttSubscriber,
   MqttPublisher,
+  WebRtcConnection,
+  WebRtcRpcRequester,
+  WebRtcSubscriber,
+  WebRtcPublisher,
   RpcRequester,
   StreamReader,
   StreamWriter,
 } from '@luxai-qtrobot/magpie'
 
-import type { MqttOptions } from '@luxai-qtrobot/magpie'
+import type { MqttOptions, WebRtcOptions } from '@luxai-qtrobot/magpie'
 
 export type SystemDescription = {
   robot_type?: string
@@ -16,8 +20,8 @@ export type SystemDescription = {
   sdk_version?: string
   min_sdk?: string
   max_sdk?: string
-  rpc: Record<string, { transports: Record<string, { topic: string; qos?: number }> }>
-  stream: Record<string, { direction: string; transports: Record<string, { topic: string; qos?: number }> }>
+  rpc: Record<string, { transports: Record<string, { topic?: string; service?: string; qos?: number }> }>
+  stream: Record<string, { direction: string; transports: Record<string, { topic?: string; service?: string; qos?: number }> }>
 }
 
 export class UnsupportedApiError extends Error {
@@ -42,6 +46,13 @@ export class UnsupportedApiError extends Error {
 export abstract class Transport {
   abstract readonly robotId: string
 
+  /**
+   * Transport key used to select the correct topic/address from the
+   * robot's system description.  Must match a key in the `transports`
+   * map returned by the robot (e.g. `"mqtt"`, `"webrtc"`).
+   */
+  abstract readonly transportKey: string
+
   /** Perform the system-describe handshake and return the robot's capability description. */
   abstract handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription>
 
@@ -61,27 +72,31 @@ export abstract class Transport {
 // ─── MQTT transport ──────────────────────────────────────────────────────────
 
 export class MqttTransport extends Transport {
+  readonly transportKey = 'mqtt'
   private _requesters = new Map<string, MqttRpcRequester>()
+  private readonly _connectTimeoutSec: number
 
   constructor(
     private readonly _conn: MqttConnection,
     readonly robotId: string,
+    connectTimeoutSec = 10,
   ) {
     super()
+    this._connectTimeoutSec = connectTimeoutSec
   }
 
   async handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription> {
-    const requester = this._getOrCreateRequester(this.robotId)
-    const raw = await requester.call({ sdk_version: sdkVersion }, timeoutSec) as {
-      status: boolean
-      response: SystemDescription
-    }
+    const requester = this._getOrCreateRequester(this.robotId, timeoutSec)
+    const raw = await requester.call(
+      { name: '/robot/system/describe', args: { sdk_version: sdkVersion } },
+      timeoutSec,
+    ) as { status: boolean; response: SystemDescription }
     if (!raw?.status) throw new Error('Robot: system describe returned status=false')
     return raw.response
   }
 
   getRequester(topic: string): RpcRequester {
-    return this._getOrCreateRequester(topic)
+    return this._getOrCreateRequester(topic, 2.0)
   }
 
   getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader {
@@ -98,10 +113,10 @@ export class MqttTransport extends Transport {
     this._conn.disconnect()
   }
 
-  private _getOrCreateRequester(topic: string): MqttRpcRequester {
+  private _getOrCreateRequester(topic: string, ackTimeout = 2.0): MqttRpcRequester {
     let req = this._requesters.get(topic)
     if (!req) {
-      req = new MqttRpcRequester(this._conn, topic)
+      req = new MqttRpcRequester(this._conn, topic, { ackTimeout })
       this._requesters.set(topic, req)
     }
     return req
@@ -113,8 +128,100 @@ export class MqttTransport extends Transport {
     options?: MqttOptions,
     connectTimeoutMs = 10_000,
   ): Promise<MqttTransport> {
-    const conn = new MqttConnection(brokerUrl, { ...options, clientId: `qtrobot-sdk-${robotId}` })
+    const suffix = Math.random().toString(36).slice(2, 8)
+    const conn = new MqttConnection(brokerUrl, { ...options, clientId: `qtrobot-sdk-${robotId}-${suffix}` })
     await conn.connect(connectTimeoutMs)
-    return new MqttTransport(conn, robotId)
+    return new MqttTransport(conn, robotId, connectTimeoutMs / 1000)
+  }
+}
+
+// ─── WebRTC signaling params ─────────────────────────────────────────────────
+
+export type WebRtcSignalingParams = {
+  brokerUrl: string
+  mqttOptions?: MqttOptions
+  webrtcOptions?: WebRtcOptions
+  reconnect: boolean
+  connectTimeoutSec: number
+}
+
+// ─── WebRTC transport ─────────────────────────────────────────────────────────
+
+export class WebRtcTransport extends Transport {
+  readonly transportKey = 'webrtc'
+  readonly signalingParams: WebRtcSignalingParams
+  private _requesters = new Map<string, WebRtcRpcRequester>()
+
+  constructor(
+    private readonly _conn: WebRtcConnection,
+    readonly robotId: string,
+    signalingParams: WebRtcSignalingParams,
+  ) {
+    super()
+    this.signalingParams = signalingParams
+  }
+
+  async handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription> {
+    const requester = this._getOrCreateRequester('/robot/system/describe')
+    const raw = await requester.call(
+      { sdk_version: sdkVersion },
+      timeoutSec,
+    ) as { status: boolean; response: SystemDescription }
+    if (!raw?.status) throw new Error('Robot: system describe returned status=false')
+    return raw.response
+  }
+
+  getRequester(topic: string): RpcRequester {
+    return this._getOrCreateRequester(topic)
+  }
+
+  getSubscriber(topic: string, _qos?: number, queueSize?: number): StreamReader {
+    return new WebRtcSubscriber(this._conn, topic, queueSize)
+  }
+
+  getPublisher(): StreamWriter {
+    return new WebRtcPublisher(this._conn)
+  }
+
+  close(): void {
+    for (const req of this._requesters.values()) req.close()
+    this._requesters.clear()
+    this._conn.disconnect()
+  }
+
+  private _getOrCreateRequester(serviceName: string): WebRtcRpcRequester {
+    let req = this._requesters.get(serviceName)
+    if (!req) {
+      req = new WebRtcRpcRequester(this._conn, serviceName)
+      this._requesters.set(serviceName, req)
+    }
+    return req
+  }
+
+  /**
+   * Create a WebRtcTransport connected via MQTT signaling.
+   *
+   * @param brokerUrl        MQTT broker URI for signaling (e.g. `wss://broker:8884/mqtt`)
+   * @param sessionId        WebRTC session identifier — `robotId` for the robot peer,
+   *                         `nodeId` for a plugin peer
+   * @param signalingParams  Full signaling config stored for plugin inheritance
+   */
+  static async create(
+    brokerUrl: string,
+    sessionId: string,
+    signalingParams: WebRtcSignalingParams,
+  ): Promise<WebRtcTransport> {
+    const conn = await WebRtcConnection.withMqtt(brokerUrl, sessionId, {
+      clientId: `qtrobot-sdk-${sessionId}-${Math.random().toString(36).slice(2, 8)}`,
+      mqttOptions: signalingParams.mqttOptions,
+      reconnect: signalingParams.reconnect,
+      webrtcOptions: signalingParams.webrtcOptions,
+    })
+    const connected = await conn.connect(signalingParams.connectTimeoutSec)
+    if (!connected) {
+      await conn.disconnect()
+      throw new Error(`WebRtcTransport: failed to connect to '${sessionId}' within ${signalingParams.connectTimeoutSec}s`)
+    }
+    return new WebRtcTransport(conn, sessionId, signalingParams)
   }
 }

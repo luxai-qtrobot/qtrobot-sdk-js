@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Speaker (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .volume-row input[type="range"] {
+      flex: 1;
+      accent-color: #3b82f6;
+      height: 6px;
+      cursor: pointer;
+    }
+    .volume-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      min-width: 48px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Speaker (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID / Session ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<div class="grid">
+
+  <!-- ── Volume ── -->
+  <div class="card">
+    <h2>Volume</h2>
+    <p class="hint">Drag the slider to set the speaker volume. Current value is fetched on connect.</p>
+    <div class="volume-row">
+      <input id="volume-slider" type="range" min="0" max="100" value="50"
+        disabled oninput="onSliderInput()" onchange="onSliderChange()" />
+      <span id="volume-value" class="volume-value">50%</span>
+    </div>
+    <div class="row">
+      <button id="btn-mute"   class="warn"    disabled onclick="doMute()">Mute</button>
+      <button id="btn-unmute" class="success" disabled onclick="doUnmute()">Unmute</button>
+    </div>
+    <div id="speaker-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot        = null
+  let applyTimer   = null   // debounce slider → setVolume
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(msg, isErr = false) {
+    const el = document.getElementById('speaker-log')
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot      = document.getElementById('status-dot')
+    const text     = document.getElementById('status-text')
+    const btn      = document.getElementById('btn-connect')
+    const controls = ['volume-slider','btn-mute','btn-unmute']
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  // ── Connect / disconnect ───────────────────────────────────────────────────
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+      await fetchVolume()
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    robot?.close()
+    robot = null
+    setStatus('disconnected')
+  }
+
+  // ── Volume ─────────────────────────────────────────────────────────────────
+
+  async function fetchVolume() {
+    try {
+      const vol = await robot.speaker.getVolume()   // 0.0 – 1.0
+      const pct = Math.round(vol * 100)
+      document.getElementById('volume-slider').value = pct
+      document.getElementById('volume-value').textContent = `${pct}%`
+      log(`Current volume: ${pct}%`)
+    } catch (err) {
+      log(`getVolume failed: ${err.message}`, true)
+    }
+  }
+
+  // Update label while dragging (no RPC yet)
+  function onSliderInput() {
+    const pct = parseInt(document.getElementById('volume-slider').value)
+    document.getElementById('volume-value').textContent = `${pct}%`
+  }
+
+  // Send RPC when user releases the slider
+  async function onSliderChange() {
+    const pct   = parseInt(document.getElementById('volume-slider').value)
+    const value = pct / 100
+    try {
+      await robot.speaker.setVolume({ value })
+      log(`Volume set to ${pct}%`)
+    } catch (err) {
+      log(`setVolume failed: ${err.message}`, true)
+    }
+  }
+
+  async function doMute() {
+    try { await robot.speaker.mute(); log('Speaker muted.') }
+    catch (err) { log(`mute failed: ${err.message}`, true) }
+  }
+
+  async function doUnmute() {
+    try { await robot.speaker.unmute(); log('Speaker unmuted.') }
+    catch (err) { log(`unmute failed: ${err.message}`, true) }
+  }
+</script>
+</body>
+</html>
