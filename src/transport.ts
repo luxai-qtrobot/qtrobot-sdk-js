@@ -20,8 +20,8 @@ export type SystemDescription = {
   sdk_version?: string
   min_sdk?: string
   max_sdk?: string
-  rpc: Record<string, { transports: Record<string, { topic: string; qos?: number }> }>
-  stream: Record<string, { direction: string; transports: Record<string, { topic: string; qos?: number }> }>
+  rpc: Record<string, { transports: Record<string, { topic?: string; service?: string; qos?: number }> }>
+  stream: Record<string, { direction: string; transports: Record<string, { topic?: string; service?: string; qos?: number }> }>
 }
 
 export class UnsupportedApiError extends Error {
@@ -74,26 +74,29 @@ export abstract class Transport {
 export class MqttTransport extends Transport {
   readonly transportKey = 'mqtt'
   private _requesters = new Map<string, MqttRpcRequester>()
+  private readonly _connectTimeoutSec: number
 
   constructor(
     private readonly _conn: MqttConnection,
     readonly robotId: string,
+    connectTimeoutSec = 10,
   ) {
     super()
+    this._connectTimeoutSec = connectTimeoutSec
   }
 
   async handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription> {
-    const requester = this._getOrCreateRequester(this.robotId)
-    const raw = await requester.call({ sdk_version: sdkVersion }, timeoutSec) as {
-      status: boolean
-      response: SystemDescription
-    }
+    const requester = this._getOrCreateRequester(this.robotId, timeoutSec)
+    const raw = await requester.call(
+      { name: '/robot/system/describe', args: { sdk_version: sdkVersion } },
+      timeoutSec,
+    ) as { status: boolean; response: SystemDescription }
     if (!raw?.status) throw new Error('Robot: system describe returned status=false')
     return raw.response
   }
 
   getRequester(topic: string): RpcRequester {
-    return this._getOrCreateRequester(topic)
+    return this._getOrCreateRequester(topic, 2.0)
   }
 
   getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader {
@@ -110,10 +113,10 @@ export class MqttTransport extends Transport {
     this._conn.disconnect()
   }
 
-  private _getOrCreateRequester(topic: string): MqttRpcRequester {
+  private _getOrCreateRequester(topic: string, ackTimeout = 2.0): MqttRpcRequester {
     let req = this._requesters.get(topic)
     if (!req) {
-      req = new MqttRpcRequester(this._conn, topic)
+      req = new MqttRpcRequester(this._conn, topic, { ackTimeout })
       this._requesters.set(topic, req)
     }
     return req
@@ -125,9 +128,10 @@ export class MqttTransport extends Transport {
     options?: MqttOptions,
     connectTimeoutMs = 10_000,
   ): Promise<MqttTransport> {
-    const conn = new MqttConnection(brokerUrl, { ...options, clientId: `qtrobot-sdk-${robotId}` })
+    const suffix = Math.random().toString(36).slice(2, 8)
+    const conn = new MqttConnection(brokerUrl, { ...options, clientId: `qtrobot-sdk-${robotId}-${suffix}` })
     await conn.connect(connectTimeoutMs)
-    return new MqttTransport(conn, robotId)
+    return new MqttTransport(conn, robotId, connectTimeoutMs / 1000)
   }
 }
 
@@ -158,11 +162,11 @@ export class WebRtcTransport extends Transport {
   }
 
   async handshake(sdkVersion: string, timeoutSec: number): Promise<SystemDescription> {
-    const requester = this._getOrCreateRequester(this.robotId)
-    const raw = await requester.call({ sdk_version: sdkVersion }, timeoutSec) as {
-      status: boolean
-      response: SystemDescription
-    }
+    const requester = this._getOrCreateRequester('/robot/system/describe')
+    const raw = await requester.call(
+      { sdk_version: sdkVersion },
+      timeoutSec,
+    ) as { status: boolean; response: SystemDescription }
     if (!raw?.status) throw new Error('Robot: system describe returned status=false')
     return raw.response
   }
@@ -208,7 +212,7 @@ export class WebRtcTransport extends Transport {
     signalingParams: WebRtcSignalingParams,
   ): Promise<WebRtcTransport> {
     const conn = await WebRtcConnection.withMqtt(brokerUrl, sessionId, {
-      clientId: `qtrobot-sdk-${sessionId}`,
+      clientId: `qtrobot-sdk-${sessionId}-${Math.random().toString(36).slice(2, 8)}`,
       mqttOptions: signalingParams.mqttOptions,
       reconnect: signalingParams.reconnect,
       webrtcOptions: signalingParams.webrtcOptions,

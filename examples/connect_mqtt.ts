@@ -13,7 +13,7 @@
 import { Robot, MqttTransport } from '../src'
 import { Logger, MqttConnection } from '@luxai-qtrobot/magpie'
 
-const BROKER_LOCAL  = 'mqtt://192.168.3.152:1883'        // robot's onboard broker
+const BROKER_LOCAL  = 'mqtt://10.231.0.2:1883'        // robot's onboard broker
 const BROKER_PUBLIC = 'mqtt://broker.hivemq.com:1883'    // public broker (no auth)
 const ROBOT_ID      = 'QTRD000320'                       // change to your robot serial
 
@@ -45,7 +45,7 @@ async function connectWithTimeouts() {
 // WebSocket transport — useful when connecting through a web proxy or firewall
 // that only allows HTTP/HTTPS traffic.
 async function connectWebSocket() {
-  const robot = await Robot.connectMqtt('ws://192.168.3.152:9001', ROBOT_ID)
+  const robot = await Robot.connectMqtt('ws://10.231.0.2:9001', ROBOT_ID)
   Logger.info(`[ws] connected to ${robot.robotId} (${robot.robotType})`)
   robot.close()
 }

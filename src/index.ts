@@ -1,4 +1,5 @@
 export { Robot } from './client'
+export { Logger } from '@luxai-qtrobot/magpie'
 export type { ConnectOptions, ConnectWebrtcMqttOptions } from './client'
 
 export { RobotApiError, withSignal } from './actions'

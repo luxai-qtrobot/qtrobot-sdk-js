@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Face (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Face (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<!-- Connection bar -->
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID / Session ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<!-- Cards -->
+<div class="grid">
+
+  <!-- ── Emotions list ── -->
+  <div class="card">
+    <h2>Emotions</h2>
+    <p class="hint">Fetch all available emotions, then click one to play it.</p>
+    <button id="btn-list" class="primary" disabled onclick="loadEmotions()">List Emotions</button>
+    <div id="emotions-grid" class="emotions-grid">
+      <span style="color:#475569;font-size:.8rem">— press List Emotions —</span>
+    </div>
+  </div>
+
+  <!-- ── Show / cancel emotion ── -->
+  <div class="card">
+    <h2>Show Emotion</h2>
+    <p class="hint">Type an emotion name or click a chip above to fill it in.</p>
+    <div>
+      <label>Emotion name</label>
+      <input id="emotion-name" type="text" placeholder="e.g. QT/happy" />
+    </div>
+    <div class="row">
+      <div>
+        <label>Speed</label>
+        <input id="emotion-speed" type="number" value="1" min="0.1" max="5" step="0.1" style="width:80px" />
+      </div>
+      <button id="btn-show" class="success" disabled onclick="toggleEmotion()">Show</button>
+    </div>
+    <div id="emotion-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Look eyes ── -->
+  <div class="card">
+    <h2>Look Eyes</h2>
+    <p class="hint">Move both eyes by pixel offset from centre. Positive x = right, positive y = down.</p>
+    <div class="row">
+      <div>
+        <label>X offset</label>
+        <input id="look-x" type="number" value="0" min="-100" max="100" step="5" />
+      </div>
+      <div>
+        <label>Y offset</label>
+        <input id="look-y" type="number" value="0" min="-100" max="100" step="5" />
+      </div>
+      <div>
+        <label>Duration (s)</label>
+        <input id="look-dur" type="number" value="2" min="0" max="10" step="0.5" />
+      </div>
+    </div>
+    <div class="row">
+      <button id="btn-look" class="primary" disabled onclick="doLook()">Look</button>
+      <button id="btn-center" class="warn" disabled onclick="doCenter()">Centre</button>
+    </div>
+    <div id="look-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot         = null
+  let showController = null   // AbortController for ongoing showEmotion
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(logId, msg, isErr = false) {
+    const el = document.getElementById(logId)
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot  = document.getElementById('status-dot')
+    const text = document.getElementById('status-text')
+    const btn  = document.getElementById('btn-connect')
+    const controls = ['btn-list', 'btn-show', 'btn-look', 'btn-center']
+
+    dot.className  = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  // ── Connect / disconnect ───────────────────────────────────────────────────
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    cancelEmotion()
+    robot?.close()
+    robot = null
+    document.getElementById('emotions-grid').innerHTML = '<span style="color:#475569;font-size:.8rem">— press List Emotions —</span>'
+    setStatus('disconnected')
+  }
+
+  // ── Emotions list ──────────────────────────────────────────────────────────
+
+  async function loadEmotions() {
+    document.getElementById('btn-list').disabled = true
+    try {
+      const emotions = await robot.face.listEmotions()
+      const grid = document.getElementById('emotions-grid')
+      grid.innerHTML = ''
+      for (const e of emotions) {
+        const chip = document.createElement('div')
+        chip.className = 'emotion-chip'
+        chip.textContent = e
+        chip.title = e
+        chip.onclick = () => {
+          document.getElementById('emotion-name').value = e
+          document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'))
+          chip.classList.add('active')
+        }
+        grid.appendChild(chip)
+      }
+    } catch (err) {
+      log('emotion-log', `listEmotions failed: ${err.message}`, true)
+    } finally {
+      document.getElementById('btn-list').disabled = false
+    }
+  }
+
+  // ── Show / cancel emotion ──────────────────────────────────────────────────
+
+  async function toggleEmotion() {
+    if (showController) { cancelEmotion(); return }
+
+    const emotion = document.getElementById('emotion-name').value.trim()
+    const speed   = parseFloat(document.getElementById('emotion-speed').value) || 1
+    if (!emotion) { alert('Enter an emotion name.'); return }
+
+    showController = new AbortController()
+    const btn = document.getElementById('btn-show')
+    btn.textContent = 'Cancel'
+    btn.className   = 'danger'
+    log('emotion-log', `Showing "${emotion}" (speed=${speed})…`)
+
+    try {
+      await robot.face.showEmotion({ emotion, speed, signal: showController.signal })
+      log('emotion-log', `Done: "${emotion}"`)
+    } catch (err) {
+      if (err.name === 'AbortError' || err.message?.includes('cancel')) {
+        log('emotion-log', `Cancelled: "${emotion}"`)
+      } else {
+        log('emotion-log', `Error: ${err.message}`, true)
+      }
+    } finally {
+      showController = null
+      btn.textContent = 'Show'
+      btn.className   = 'success'
+      document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'))
+    }
+  }
+
+  function cancelEmotion() {
+    if (showController) { showController.abort(); showController = null }
+  }
+
+  // ── Look eyes ──────────────────────────────────────────────────────────────
+
+  async function doLook() {
+    const x   = parseInt(document.getElementById('look-x').value)   || 0
+    const y   = parseInt(document.getElementById('look-y').value)   || 0
+    const dur = parseFloat(document.getElementById('look-dur').value) ?? 2
+    log('look-log', `Looking to (${x}, ${y}) for ${dur}s…`)
+    try {
+      await robot.face.look({ l_eye: [x, y], r_eye: [x, y], duration: dur })
+      log('look-log', `Done.`)
+    } catch (err) {
+      log('look-log', `Error: ${err.message}`, true)
+    }
+  }
+
+  async function doCenter() {
+    log('look-log', 'Centering eyes…')
+    try {
+      await robot.face.look({ l_eye: [0, 0], r_eye: [0, 0], duration: 0 })
+      log('look-log', 'Eyes centred.')
+    } catch (err) {
+      log('look-log', `Error: ${err.message}`, true)
+    }
+  }
+</script>
+</body>
+</html>

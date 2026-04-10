@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — TTS (MQTT)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    textarea {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #e2e8f0;
+      font-size: .88rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+    textarea:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #e2e8f0;
+      font-size: .88rem;
+    }
+    select:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — TTS (MQTT)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<div class="grid">
+
+  <!-- ── Say Text ── -->
+  <div class="card">
+    <h2>Say Text</h2>
+    <p class="hint">Speak plain text. Load engines first to populate the engine and voice dropdowns.</p>
+    <div class="row">
+      <button id="btn-load-engines" class="primary" disabled onclick="loadEngines()">Load Engines</button>
+    </div>
+    <div>
+      <label>Text</label>
+      <textarea id="say-text" rows="3" placeholder="Hello, I am QTrobot!"></textarea>
+    </div>
+    <div class="row">
+      <div>
+        <label>Engine</label>
+        <select id="say-engine">
+          <option value="">default</option>
+        </select>
+      </div>
+      <div>
+        <label>Voice</label>
+        <select id="say-voice">
+          <option value="">default</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Rate</label>
+        <input id="say-rate" type="number" value="1" min="0.1" max="3" step="0.05" />
+      </div>
+      <div>
+        <label>Pitch</label>
+        <input id="say-pitch" type="number" value="1" min="0.1" max="3" step="0.05" />
+      </div>
+      <button id="btn-say" class="success" disabled onclick="toggleSay()">Say</button>
+    </div>
+    <div id="say-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Engine info ── -->
+  <div class="card">
+    <h2>Engine Info</h2>
+    <p class="hint">Inspect languages and voices for the selected engine.</p>
+    <div>
+      <label>Engine</label>
+      <select id="info-engine">
+        <option value="">default</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="btn-languages" class="primary" disabled onclick="loadLanguages()">Languages</button>
+      <button id="btn-voices"    class="primary" disabled onclick="loadVoices()">Voices</button>
+    </div>
+    <div id="info-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot         = null
+  let sayController = null
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(logId, msg, isErr = false) {
+    const el = document.getElementById(logId)
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot      = document.getElementById('status-dot')
+    const text     = document.getElementById('status-text')
+    const btn      = document.getElementById('btn-connect')
+    const controls = ['btn-load-engines','btn-say','btn-languages','btn-voices']
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectMqtt(broker, robotId, { connectTimeoutSec: 15 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    cancelSay()
+    robot?.close()
+    robot = null
+    setStatus('disconnected')
+  }
+
+  async function loadEngines() {
+    document.getElementById('btn-load-engines').disabled = true
+    try {
+      const engines = await robot.tts.listEngines()
+      const defaultEngine = await robot.tts.getDefaultEngine()
+
+      const makeOptions = () => {
+        let html = '<option value="">default</option>'
+        for (const e of engines) {
+          html += `<option value="${e}"${e === defaultEngine ? ' selected' : ''}>${e}${e === defaultEngine ? ' (default)' : ''}</option>`
+        }
+        return html
+      }
+
+      document.getElementById('say-engine').innerHTML = makeOptions()
+      document.getElementById('info-engine').innerHTML = makeOptions()
+      log('say-log', `Engines: ${engines.join(', ')} — default: ${defaultEngine}`)
+      await loadVoicesForEngine(defaultEngine)
+    } catch (err) {
+      log('say-log', `loadEngines failed: ${err.message}`, true)
+    } finally {
+      document.getElementById('btn-load-engines').disabled = false
+    }
+  }
+
+  function voiceName(v) {
+    if (typeof v === 'string') return v
+    return v?.name ?? v?.id ?? JSON.stringify(v)
+  }
+
+  async function loadVoicesForEngine(engine) {
+    try {
+      const voices = await robot.tts.getVoices(engine ? { engine } : {})
+      const sel = document.getElementById('say-voice')
+      sel.innerHTML = '<option value="">default</option>'
+      for (const v of voices) {
+        const name = voiceName(v)
+        sel.innerHTML += `<option value="${name}">${name}</option>`
+      }
+    } catch {
+      // voices not critical — leave as default
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('say-engine').addEventListener('change', e => {
+      if (robot) loadVoicesForEngine(e.target.value)
+    })
+  })
+
+  async function toggleSay() {
+    if (sayController) { cancelSay(); return }
+
+    const text   = document.getElementById('say-text').value.trim()
+    const engine = document.getElementById('say-engine').value || undefined
+    const voice  = document.getElementById('say-voice').value  || undefined
+    const rate   = parseFloat(document.getElementById('say-rate').value)  || undefined
+    const pitch  = parseFloat(document.getElementById('say-pitch').value) || undefined
+    if (!text) { alert('Enter text to speak.'); return }
+
+    sayController = new AbortController()
+    const btn = document.getElementById('btn-say')
+    btn.textContent = 'Cancel'
+    btn.className   = 'danger'
+    log('say-log', `Speaking${engine ? ` [${engine}]` : ''}…`)
+
+    try {
+      await robot.tts.sayText({ text, engine, voice, rate, pitch, signal: sayController.signal })
+      log('say-log', 'Done.')
+    } catch (err) {
+      if (err.name === 'AbortError' || err.message?.includes('cancel')) {
+        log('say-log', 'Cancelled.')
+      } else {
+        log('say-log', `Error: ${err.message}`, true)
+      }
+    } finally {
+      sayController = null
+      btn.textContent = 'Say'
+      btn.className   = 'success'
+    }
+  }
+
+  function cancelSay() {
+    if (sayController) { sayController.abort(); sayController = null }
+  }
+
+  async function loadLanguages() {
+    const engine = document.getElementById('info-engine').value || undefined
+    try {
+      const langs = await robot.tts.getLanguages(engine ? { engine } : {})
+      log('info-log', `Languages: ${langs.join(', ')}`)
+    } catch (err) {
+      log('info-log', `Error: ${err.message}`, true)
+    }
+  }
+
+  async function loadVoices() {
+    const engine = document.getElementById('info-engine').value || undefined
+    try {
+      const voices = await robot.tts.getVoices(engine ? { engine } : {})
+      log('info-log', `Voices (${voices.length}): ${voices.map(voiceName).join(', ')}`)
+    } catch (err) {
+      log('info-log', `Error: ${err.message}`, true)
+    }
+  }
+</script>
+</body>
+</html>

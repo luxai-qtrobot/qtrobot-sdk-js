@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Motor (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    .joint-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+      font-family: 'Courier New', monospace;
+    }
+    .joint-table th {
+      text-align: left;
+      padding: 4px 8px;
+      color: #60a5fa;
+      border-bottom: 1px solid #334155;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .joint-table td {
+      padding: 3px 8px;
+      color: #94a3b8;
+      border-bottom: 1px solid #1e293b;
+      white-space: nowrap;
+    }
+    .joint-table td:first-child { color: #e2e8f0; }
+    .stream-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: .72rem;
+      font-weight: 600;
+      background: #334155;
+      color: #94a3b8;
+    }
+    .stream-badge.active { background: #14532d; color: #86efac; }
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #e2e8f0;
+      font-size: .88rem;
+    }
+    select:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Motor (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID / Session ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<div class="grid">
+
+  <!-- ── Motor control ── -->
+  <div class="card">
+    <h2>Motor Control</h2>
+    <p class="hint">Load the motor list, select one, then apply commands.</p>
+    <div class="row">
+      <button id="btn-list" class="primary" disabled onclick="loadMotors()">List Motors</button>
+    </div>
+    <div>
+      <label>Motor</label>
+      <select id="motor-select" disabled>
+        <option value="">— press List Motors —</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="btn-on"   class="success" disabled onclick="doOn()">Torque On</button>
+      <button id="btn-off"  class="warn"    disabled onclick="doOff()">Torque Off</button>
+      <button id="btn-home" class="primary" disabled onclick="doHome()">Home</button>
+    </div>
+    <div class="row">
+      <button id="btn-on-all"   class="success" disabled onclick="doOnAll()">All On</button>
+      <button id="btn-off-all"  class="warn"    disabled onclick="doOffAll()">All Off</button>
+      <button id="btn-home-all" class="primary" disabled onclick="doHomeAll()">All Home</button>
+    </div>
+    <div id="motor-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Joint command ── -->
+  <div class="card">
+    <h2>Joint Command</h2>
+    <p class="hint">Send a position command to a motor. Velocity is optional (degrees/s).</p>
+    <div>
+      <label>Motor</label>
+      <select id="cmd-motor-select" disabled>
+        <option value="">— press List Motors —</option>
+      </select>
+    </div>
+    <div class="row">
+      <div>
+        <label>Position (°)</label>
+        <input id="cmd-position" type="number" value="0" step="1" />
+      </div>
+      <div>
+        <label>Velocity (°/s)</label>
+        <input id="cmd-velocity" type="number" value="40" min="0" step="1" />
+      </div>
+      <button id="btn-cmd" class="success" disabled onclick="doCommand()">Send</button>
+    </div>
+    <div id="cmd-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Joint state stream ── -->
+  <div class="card" style="grid-column: 1 / -1">
+    <h2>Joint State <span id="stream-badge" class="stream-badge">● stopped</span></h2>
+    <p class="hint">Live position, velocity, effort, temperature and voltage for each joint.</p>
+    <button id="btn-stream" class="primary" disabled onclick="toggleStream()">Start Stream</button>
+    <div style="overflow-x:auto">
+      <table class="joint-table">
+        <thead>
+          <tr>
+            <th>Joint</th>
+            <th>Pos (°)</th>
+            <th>Vel (°/s)</th>
+            <th>Effort</th>
+            <th>Temp (°C)</th>
+            <th>Volt (V)</th>
+          </tr>
+        </thead>
+        <tbody id="joint-tbody">
+          <tr><td colspan="6" style="color:#475569;text-align:center">— start stream —</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot, JointCommandFrame } = QTRobotSDK
+
+  let robot       = null
+  let stateReader = null
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(logId, msg, isErr = false) {
+    const el = document.getElementById(logId)
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot      = document.getElementById('status-dot')
+    const text     = document.getElementById('status-text')
+    const btn      = document.getElementById('btn-connect')
+    const controls = ['btn-list','btn-on','btn-off','btn-home','btn-on-all','btn-off-all','btn-home-all','btn-stream','btn-cmd']
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  // ── Connect / disconnect ───────────────────────────────────────────────────
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    stopStream()
+    robot?.close()
+    robot = null
+    const empty = '<option value="">— press List Motors —</option>'
+    document.getElementById('motor-select').innerHTML = empty
+    document.getElementById('cmd-motor-select').innerHTML = empty
+    document.getElementById('motor-select').disabled = true
+    document.getElementById('cmd-motor-select').disabled = true
+    document.getElementById('joint-tbody').innerHTML =
+      '<tr><td colspan="6" style="color:#475569;text-align:center">— start stream —</td></tr>'
+    setStatus('disconnected')
+  }
+
+  // ── Motor list ─────────────────────────────────────────────────────────────
+
+  async function loadMotors() {
+    document.getElementById('btn-list').disabled = true
+    try {
+      const motors = await robot.motor.list()
+      const names  = Object.keys(motors).sort()
+      const makeOptions = () => names.map(n => `<option value="${n}">${n}</option>`).join('')
+      const sel1 = document.getElementById('motor-select')
+      const sel2 = document.getElementById('cmd-motor-select')
+      sel1.innerHTML = makeOptions()
+      sel2.innerHTML = makeOptions()
+      sel1.disabled = false
+      sel2.disabled = false
+      log('motor-log', `Loaded ${names.length} motors.`)
+    } catch (err) {
+      log('motor-log', `listMotors failed: ${err.message}`, true)
+    } finally {
+      document.getElementById('btn-list').disabled = false
+    }
+  }
+
+  // ── Motor commands ─────────────────────────────────────────────────────────
+
+  function selectedMotor() {
+    return document.getElementById('motor-select').value
+  }
+
+  async function doOn() {
+    const motor = selectedMotor()
+    if (!motor) { alert('Select a motor.'); return }
+    try { await robot.motor.on({ motor }); log('motor-log', `Torque ON: ${motor}`) }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  async function doOff() {
+    const motor = selectedMotor()
+    if (!motor) { alert('Select a motor.'); return }
+    try { await robot.motor.off({ motor }); log('motor-log', `Torque OFF: ${motor}`) }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  async function doHome() {
+    const motor = selectedMotor()
+    if (!motor) { alert('Select a motor.'); return }
+    try { await robot.motor.home({ motor }); log('motor-log', `Home: ${motor}`) }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  async function doOnAll() {
+    try { await robot.motor.onAll(); log('motor-log', 'Torque ON: all motors') }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  async function doOffAll() {
+    try { await robot.motor.offAll(); log('motor-log', 'Torque OFF: all motors') }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  async function doHomeAll() {
+    try { await robot.motor.homeAll(); log('motor-log', 'Home: all motors') }
+    catch (err) { log('motor-log', `Error: ${err.message}`, true) }
+  }
+
+  // ── Joint command ──────────────────────────────────────────────────────────
+
+  async function doCommand() {
+    const motor    = document.getElementById('cmd-motor-select').value
+    const position = parseFloat(document.getElementById('cmd-position').value)
+    const velocity = parseFloat(document.getElementById('cmd-velocity').value)
+    if (!motor) { alert('Select a motor.'); return }
+
+    try {
+      const writer = robot.motor.openJointsCommandWriter()
+      const cmd = new JointCommandFrame()
+      cmd.setJoint(motor, { position, velocity })
+      await writer.write(cmd)
+      writer.close()
+      log('cmd-log', `Sent ${motor}: pos=${position}°, vel=${velocity}°/s`)
+    } catch (err) {
+      log('cmd-log', `Error: ${err.message}`, true)
+    }
+  }
+
+  // ── Joint state stream ─────────────────────────────────────────────────────
+
+  function toggleStream() {
+    if (stateReader) { stopStream(); return }
+
+    stateReader = robot.motor.jointsStateReader()
+    const btn   = document.getElementById('btn-stream')
+    const badge = document.getElementById('stream-badge')
+    btn.textContent   = 'Stop Stream'
+    btn.className     = 'danger'
+    badge.textContent = '● live'
+    badge.className   = 'stream-badge active'
+    readLoop()
+  }
+
+  function stopStream() {
+    if (!stateReader) return
+    stateReader.close()
+    stateReader = null
+    const btn   = document.getElementById('btn-stream')
+    const badge = document.getElementById('stream-badge')
+    btn.textContent   = 'Start Stream'
+    btn.className     = 'primary'
+    badge.textContent = '● stopped'
+    badge.className   = 'stream-badge'
+  }
+
+  async function readLoop() {
+    while (stateReader) {
+      try {
+        const frame = await stateReader.read(3.0)
+        renderFrame(frame)
+      } catch (err) {
+        if (!stateReader) break
+        if (err.name === 'TimeoutError') continue
+        log('motor-log', `Stream error: ${err.message}`, true)
+        stopStream()
+        break
+      }
+    }
+  }
+
+  function renderFrame(frame) {
+    const tbody  = document.getElementById('joint-tbody')
+    const joints = frame.joints()
+    if (!joints.length) return
+
+    const existing = {}
+    for (const tr of tbody.querySelectorAll('tr[data-joint]')) {
+      existing[tr.dataset.joint] = tr
+    }
+
+    for (const j of joints) {
+      const pos  = frame.position(j).toFixed(2)
+      const vel  = frame.velocity(j).toFixed(2)
+      const eff  = frame.effort(j).toFixed(2)
+      const temp = frame.temperature(j).toFixed(1)
+      const volt = frame.voltage(j).toFixed(2)
+
+      if (existing[j]) {
+        const cells = existing[j].querySelectorAll('td')
+        cells[1].textContent = pos
+        cells[2].textContent = vel
+        cells[3].textContent = eff
+        cells[4].textContent = temp
+        cells[5].textContent = volt
+      } else {
+        const tr = document.createElement('tr')
+        tr.dataset.joint = j
+        tr.innerHTML = `<td>${j}</td><td>${pos}</td><td>${vel}</td><td>${eff}</td><td>${temp}</td><td>${volt}</td>`
+        tbody.appendChild(tr)
+      }
+    }
+
+    for (const [j, tr] of Object.entries(existing)) {
+      if (!joints.includes(j)) tr.remove()
+    }
+  }
+</script>
+</body>
+</html>

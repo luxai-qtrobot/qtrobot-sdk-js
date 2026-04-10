@@ -192,7 +192,8 @@ export class Robot {
 
     // Strip undefined values so the wire dict stays clean
     const filteredArgs = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined))
-    const raw = await requester.call(filteredArgs, timeout) as { status: boolean; response: T }
+    const rpcReq = { name: serviceName, args: filteredArgs }
+    const raw = await requester.call(rpcReq, timeout) as { status: boolean; response: T }
 
     if (!raw?.status) {
       throw new RobotApiError(`Service '${serviceName}' returned status=false`)
@@ -381,13 +382,15 @@ export class Robot {
     const key = transport.transportKey
     for (const [service, meta] of Object.entries(desc.rpc ?? {})) {
       const t = meta.transports?.[key]
-      if (t?.topic) this._rpcRoutes.set(service, { transport, topic: t.topic })
+      const addr = t?.topic ?? t?.service
+      if (addr) this._rpcRoutes.set(service, { transport, topic: addr })
     }
     for (const [topic, meta] of Object.entries(desc.stream ?? {})) {
-      const m = meta as { direction?: string; transports?: Record<string, { topic: string; qos?: number }> }
+      const m = meta as { direction?: string; transports?: Record<string, { topic?: string; service?: string; qos?: number }> }
       const t = m.transports?.[key]
+      const addr = t?.topic ?? t?.service
       const direction = m.direction as 'in' | 'out' | undefined
-      if (t?.topic) this._streamRoutes.set(topic, { transport, topic: t.topic, qos: t.qos, direction })
+      if (addr) this._streamRoutes.set(topic, { transport, topic: addr, qos: t?.qos, direction })
     }
   }
 }

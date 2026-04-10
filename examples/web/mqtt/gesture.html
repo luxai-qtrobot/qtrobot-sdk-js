@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Gesture (MQTT)</title>
+  <link rel="stylesheet" href="../common.css" />
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Gesture (MQTT)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<!-- Connection bar -->
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<!-- Cards -->
+<div class="grid">
+
+  <!-- ── Gesture list ── -->
+  <div class="card">
+    <h2>Gestures</h2>
+    <p class="hint">Fetch all available gestures, then click one to play it.</p>
+    <button id="btn-list" class="primary" disabled onclick="loadGestures()">List Gestures</button>
+    <div id="gestures-grid" class="emotions-grid">
+      <span style="color:#475569;font-size:.8rem">— press List Gestures —</span>
+    </div>
+  </div>
+
+  <!-- ── Play gesture ── -->
+  <div class="card">
+    <h2>Play Gesture</h2>
+    <p class="hint">Type a gesture name or click a chip above to fill it in.</p>
+    <div>
+      <label>Gesture name</label>
+      <input id="gesture-name" type="text" placeholder="e.g. QT/dance" />
+    </div>
+    <div class="row">
+      <div>
+        <label>Speed</label>
+        <input id="gesture-speed" type="number" value="1" min="0.1" max="5" step="0.1" style="width:80px" />
+      </div>
+      <button id="btn-play" class="success" disabled onclick="toggleGesture()">Play</button>
+    </div>
+    <div id="gesture-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot          = null
+  let playController = null
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(logId, msg, isErr = false) {
+    const el = document.getElementById(logId)
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot      = document.getElementById('status-dot')
+    const text     = document.getElementById('status-text')
+    const btn      = document.getElementById('btn-connect')
+    const controls = ['btn-list', 'btn-play']
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    controls.forEach(id => document.getElementById(id).disabled = state !== 'connected')
+  }
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectMqtt(broker, robotId, { connectTimeoutSec: 15 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      setStatus('disconnected')
+      alert(`Connection failed: ${err.message}`)
+    }
+  }
+
+  async function doDisconnect() {
+    cancelGesture()
+    robot?.close()
+    robot = null
+    document.getElementById('gestures-grid').innerHTML = '<span style="color:#475569;font-size:.8rem">— press List Gestures —</span>'
+    setStatus('disconnected')
+  }
+
+  async function loadGestures() {
+    document.getElementById('btn-list').disabled = true
+    try {
+      const gestures = await robot.gesture.listFiles()
+      const grid = document.getElementById('gestures-grid')
+      grid.innerHTML = ''
+      for (const g of gestures) {
+        const chip = document.createElement('div')
+        chip.className = 'emotion-chip'
+        chip.textContent = g
+        chip.title = g
+        chip.onclick = () => {
+          document.getElementById('gesture-name').value = g.replace(/\.xml$/i, '')
+          document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'))
+          chip.classList.add('active')
+        }
+        grid.appendChild(chip)
+      }
+    } catch (err) {
+      log('gesture-log', `listFiles failed: ${err.message}`, true)
+    } finally {
+      document.getElementById('btn-list').disabled = false
+    }
+  }
+
+  async function toggleGesture() {
+    if (playController) { cancelGesture(); return }
+
+    const gesture      = document.getElementById('gesture-name').value.trim()
+    const speed_factor = parseFloat(document.getElementById('gesture-speed').value) || 1
+    if (!gesture) { alert('Enter a gesture name.'); return }
+
+    playController = new AbortController()
+    const btn = document.getElementById('btn-play')
+    btn.textContent = 'Cancel'
+    btn.className   = 'danger'
+    log('gesture-log', `Playing "${gesture}" (speed=${speed_factor})…`)
+
+    try {
+      const ok = await robot.gesture.playFile({ gesture, speed_factor, signal: playController.signal })
+      if (ok === false) {
+        log('gesture-log', `Failed: "${gesture}" not found or could not be played.`, true)
+      } else {
+        log('gesture-log', `Done: "${gesture}"`)
+      }
+    } catch (err) {
+      if (err.name === 'AbortError' || err.message?.includes('cancel')) {
+        log('gesture-log', `Cancelled: "${gesture}"`)
+      } else {
+        log('gesture-log', `Error: ${err.message}`, true)
+      }
+    } finally {
+      playController = null
+      btn.textContent = 'Play'
+      btn.className   = 'success'
+      document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'))
+    }
+  }
+
+  function cancelGesture() {
+    if (playController) { playController.abort(); playController = null }
+  }
+</script>
+</body>
+</html>
