@@ -151,6 +151,7 @@ export class WebRtcTransport extends Transport {
   readonly transportKey = 'webrtc'
   readonly signalingParams: WebRtcSignalingParams
   private _requesters = new Map<string, WebRtcRpcRequester>()
+  get connection(): WebRtcConnection { return this._conn }
 
   constructor(
     private readonly _conn: WebRtcConnection,

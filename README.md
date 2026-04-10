@@ -811,7 +811,7 @@ npm run example:<name>
 
 ### Web browser examples
 
-Interactive HTML pages in [`examples/web/`](examples/web/). Each feature has two variants — **MQTT** (direct broker connection) and **WebRTC** (P2P data channel, MQTT only for signaling). Open the files directly in a browser after building the SDK (`npm run build`).
+Interactive HTML pages in [`examples/web/`](examples/web/). Most features have two variants — **MQTT** (direct broker connection) and **WebRTC** (P2P data channel, MQTT only for signaling). Open the files directly in a browser after building the SDK (`npm run build`).
 
 | Feature | MQTT | WebRTC | Demonstrates |
 |---|---|---|---|
@@ -822,6 +822,7 @@ Interactive HTML pages in [`examples/web/`](examples/web/). Each feature has two
 | Speaker | [`mqtt/speaker.html`](examples/web/mqtt/speaker.html) | [`webrtc/speaker.html`](examples/web/webrtc/speaker.html) | Master volume slider, mute/unmute |
 | Audio | [`mqtt/audio.html`](examples/web/mqtt/audio.html) | [`webrtc/audio.html`](examples/web/webrtc/audio.html) | FG/BG file and stream playback, per-lane volume, pause/resume/cancel |
 | Video | [`mqtt/video.html`](examples/web/mqtt/video.html) | [`webrtc/video.html`](examples/web/webrtc/video.html) | FG/BG video file playback, FG alpha slider, pause/resume/cancel |
+| Microphone | — | [`webrtc/microphone.html`](examples/web/webrtc/microphone.html) | Live robot mic audio via WebRTC media track, mute/unmute |
 
 ---
 

@@ -10,6 +10,7 @@ import { MicrophoneApi } from './api/microphone'
 import { MediaApi } from './api/media'
 import { SpeakerApi } from './api/speaker'
 import { CameraApi } from './api/camera'
+import { ExtraApi } from './api/extra'
 
 const SDK_VERSION = '0.1.0'
 
@@ -57,6 +58,7 @@ export class Robot {
   readonly microphone: MicrophoneApi
   readonly media: MediaApi
   readonly speaker: SpeakerApi
+  readonly extra: ExtraApi
 
   // Plugin API namespaces (set by enablePlugin / enablePluginMqtt)
   private _camera?: CameraApi
@@ -94,6 +96,7 @@ export class Robot {
     this.microphone = new MicrophoneApi(this)
     this.media      = new MediaApi(this)
     this.speaker    = new SpeakerApi(this)
+    this.extra      = new ExtraApi(this)
   }
 
   // ─── Connection helpers ───────────────────────────────────────────────────

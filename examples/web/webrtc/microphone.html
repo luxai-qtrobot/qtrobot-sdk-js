@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Microphone (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Microphone (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID / Session ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>Robot Microphone</h2>
+    <p class="hint">
+      Streams the robot's internal microphone audio directly to the browser via
+      WebRTC media track. Requires <code>use_media_channels=true</code> on the
+      robot gateway (default).
+    </p>
+    <div class="row" style="justify-content:center;margin-top:8px">
+      <button id="btn-mute" class="warn" disabled onclick="toggleMute()">Mute</button>
+    </div>
+    <audio id="audio-el" autoplay style="display:none"></audio>
+    <div id="mic-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot  = null
+  let muted  = false
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(msg, isErr = false) {
+    const el = document.getElementById('mic-log')
+    el.innerHTML = `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot  = document.getElementById('status-dot')
+    const text = document.getElementById('status-text')
+    const btn  = document.getElementById('btn-connect')
+
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    document.getElementById('btn-mute').disabled = state !== 'connected'
+  }
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+
+      log('Requesting audio track…')
+      const track = await robot.extra.getAudioTrack()
+      const audioEl = document.getElementById('audio-el')
+      audioEl.srcObject = new MediaStream([track])
+      muted = false
+      document.getElementById('btn-mute').textContent = 'Mute'
+      log('Streaming robot microphone audio.')
+    } catch (err) {
+      setStatus('disconnected')
+      log(`Error: ${err.message}`, true)
+    }
+  }
+
+  async function doDisconnect() {
+    const audioEl = document.getElementById('audio-el')
+    audioEl.srcObject = null
+    robot?.close()
+    robot = null
+    muted = false
+    document.getElementById('btn-mute').textContent = 'Mute'
+    setStatus('disconnected')
+    log('Disconnected.')
+  }
+
+  function toggleMute() {
+    const audioEl = document.getElementById('audio-el')
+    muted = !muted
+    audioEl.muted = muted
+    document.getElementById('btn-mute').textContent = muted ? 'Unmute' : 'Mute'
+    log(muted ? 'Muted.' : 'Unmuted.')
+  }
+</script>
+</body>
+</html>
