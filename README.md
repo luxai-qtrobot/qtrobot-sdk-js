@@ -772,19 +772,67 @@ robot.microphone.onIntEvent((evt) => {
 
 ## Plugin System
 
-Plugins extend the SDK with hardware or services that run outside the robot's core firmware — for example, a RealSense depth camera or an ASR engine.
+Plugins extend the SDK with hardware or services that run outside the robot's core firmware — for example, a RealSense depth camera or an ASR engine. Each plugin runs as a separate node with its own transport connection. Enable a plugin before accessing its API namespace.
 
-Each plugin runs as a separate node accessible over its own MQTT topic prefix. Enable a plugin before accessing its API namespace.
+### MQTT plugin
 
 ```typescript
-// Connect to a plugin over MQTT (convenience)
+// Connect to a plugin node over MQTT
 await robot.enablePluginMqtt('camera', 'mqtt://192.168.1.100:1883', 'QTRD000320/realsense')
 
-// Or construct the transport yourself (for custom protocols)
-await robot.enablePlugin('camera', new MyCustomTransport(...))
-
-// Disable and disconnect a plugin
+const intrinsics = await robot.camera!.getColorIntrinsics()
 robot.disablePlugin('camera')
+```
+
+### WebRTC plugin
+
+When the robot is connected via WebRTC, plugins can also connect via their own independent WebRTC peer connection. Signaling parameters (broker URL, TURN servers, etc.) are inherited from the robot connection automatically.
+
+```typescript
+const robot = await Robot.connectWebrtcMqtt('ws://192.168.1.100:9001', 'QTRD000320')
+
+// Connect to the RealSense driver plugin via WebRTC
+// nodeId is the WebRTC session ID configured on the robot for this plugin
+await robot.enablePluginWebrtcMqtt('camera', 'qtrobot-realsense-driver')
+
+const intrinsics = await robot.camera!.getColorIntrinsics()
+robot.disablePlugin('camera')
+```
+
+Pass explicit options to override inherited signaling parameters (e.g. different broker or TURN servers):
+
+```typescript
+await robot.enablePluginWebrtcMqtt('camera', 'qtrobot-realsense-driver', {
+  connectTimeoutSec: 30,
+  webrtcOptions: { turnServers: [{ url: 'turn:...', username: '...', credential: '...' }] },
+})
+```
+
+### WebRTC media tracks (`robot.extra` / `robot.camera.extra`)
+
+When `use_media_channels=true` (the robot gateway default), native WebRTC media tracks are used for audio and video. Use `robot.extra` or `robot.camera.extra` to get the `MediaStreamTrack` and attach it to an `<audio>` or `<video>` element in the browser.
+
+```typescript
+// Robot microphone audio track (from the main robot connection)
+const audioTrack = await robot.extra.getAudioTrack()
+const audio = new Audio()
+audio.srcObject = new MediaStream([audioTrack])
+audio.play()
+
+// Camera video track (from the camera plugin connection)
+await robot.enablePluginWebrtcMqtt('camera', 'qtrobot-realsense-driver')
+const videoTrack = await robot.camera!.extra.getVideoTrack()
+videoEl.srcObject = new MediaStream([videoTrack])
+videoEl.play()
+```
+
+> `getAudioTrack()` / `getVideoTrack()` throw `UnsupportedApiError` when the connection is not WebRTC or `use_media_channels=false`.
+
+### Low-level plugin enabler
+
+```typescript
+// Construct a transport yourself (for custom protocols)
+await robot.enablePlugin('camera', new MyCustomTransport(...))
 ```
 
 ---
@@ -823,6 +871,7 @@ Interactive HTML pages in [`examples/web/`](examples/web/). Most features have t
 | Audio | [`mqtt/audio.html`](examples/web/mqtt/audio.html) | [`webrtc/audio.html`](examples/web/webrtc/audio.html) | FG/BG file and stream playback, per-lane volume, pause/resume/cancel |
 | Video | [`mqtt/video.html`](examples/web/mqtt/video.html) | [`webrtc/video.html`](examples/web/webrtc/video.html) | FG/BG video file playback, FG alpha slider, pause/resume/cancel |
 | Microphone | — | [`webrtc/microphone.html`](examples/web/webrtc/microphone.html) | Live robot mic audio via WebRTC media track, mute/unmute |
+| Camera | — | [`webrtc/camera.html`](examples/web/webrtc/camera.html) | Live camera video via plugin WebRTC peer (`enablePluginWebrtcMqtt`), color intrinsics |
 
 ---
 

@@ -4,9 +4,13 @@
 import type { Robot } from '../client'
 import { TypedStreamReader } from '../streams'
 import { Frame, ImageFrameRaw } from '@luxai-qtrobot/magpie'
+import { ExtraApi } from './extra'
 
 export class CameraApi {
-  constructor(private readonly _robot: Robot) {}
+  readonly extra: ExtraApi
+  constructor(private readonly _robot: Robot, extra: ExtraApi) {
+    this.extra = extra
+  }
 
   /**
    * Get color camera intrinsic parameters (fx, fy, ppx, ppy, width, height, model, coeffs).

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Camera (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    video {
+      width: 100%;
+      border-radius: 8px;
+      background: #0f172a;
+      margin-top: 8px;
+    }
+    .intrinsics-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+      margin-top: 8px;
+    }
+    .intrinsics-table th, .intrinsics-table td {
+      text-align: left;
+      padding: 4px 8px;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+    }
+    .intrinsics-table th { color: #94a3b8; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Camera (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="broker-bar">
+  <input id="broker-uri" type="text"
+    value="ws://10.231.0.2:9001"
+    placeholder="ws://robot-ip:9001 (MQTT WebSocket for signaling)" />
+  <input id="robot-id" class="robot-id" type="text"
+    value="QTRD000320"
+    placeholder="Robot ID" />
+  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+</div>
+
+<!-- Plugin node ID row -->
+<div class="broker-bar" style="margin-top:6px">
+  <input id="plugin-id" type="text"
+    value="qtrobot-realsense-driver"
+    placeholder="Plugin node ID (e.g. qtrobot-realsense-driver)"
+    style="flex:1" />
+  <button id="btn-plugin" class="primary" disabled onclick="togglePlugin()">Enable Camera Plugin</button>
+</div>
+
+<div class="grid">
+
+  <!-- ── Live video ── -->
+  <div class="card">
+    <h2>Live Video</h2>
+    <p class="hint">
+      RTP video track from <code>qtrobot-realsense-driver</code> via WebRTC
+      media channel. Requires <code>use_media_channels=true</code> on the
+      plugin gateway (default).
+    </p>
+    <video id="video-el" autoplay playsinline muted></video>
+    <div id="video-log" class="log"><span style="color:#475569">— waiting —</span></div>
+  </div>
+
+  <!-- ── Camera intrinsics ── -->
+  <div class="card">
+    <h2>Color Intrinsics</h2>
+    <p class="hint">Fetched via RPC once the plugin is connected.</p>
+    <table class="intrinsics-table">
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody id="intrinsics-body">
+        <tr><td colspan="2" style="color:#475569">— waiting —</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script>
+  const { Robot } = QTRobotSDK
+
+  let robot       = null
+  let pluginReady = false
+
+  function ts() {
+    return new Date().toLocaleTimeString('en-GB', { hour12: false })
+  }
+
+  function log(id, msg, isErr = false) {
+    document.getElementById(id).innerHTML =
+      `<div class="entry"><span class="ts">${ts()}</span><span class="${isErr ? 'err' : 'ok'}">${msg}</span></div>`
+  }
+
+  function setStatus(state, detail) {
+    const dot  = document.getElementById('status-dot')
+    const text = document.getElementById('status-text')
+    const btn  = document.getElementById('btn-connect')
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+    btn.textContent  = state === 'connected' ? 'Disconnect' : 'Connect'
+    btn.className    = state === 'connected' ? 'danger' : 'primary'
+    btn.disabled     = state === 'connecting'
+    document.getElementById('btn-plugin').disabled = state !== 'connected' || pluginReady
+  }
+
+  // ── Robot connect / disconnect ────────────────────────────────────────────
+
+  async function toggleConnect() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    setStatus('connecting')
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, { connectTimeoutSec: 30 })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      setStatus('disconnected')
+      log('video-log', `Connection failed: ${err.message}`, true)
+    }
+  }
+
+  async function doDisconnect() {
+    document.getElementById('video-el').srcObject = null
+    document.getElementById('intrinsics-body').innerHTML =
+      '<tr><td colspan="2" style="color:#475569">— waiting —</td></tr>'
+    robot?.close()
+    robot = null
+    pluginReady = false
+    document.getElementById('btn-plugin').textContent = 'Enable Camera Plugin'
+    setStatus('disconnected')
+    log('video-log', 'Disconnected.')
+  }
+
+  // ── Plugin ────────────────────────────────────────────────────────────────
+
+  async function togglePlugin() {
+    if (pluginReady) {
+      robot.disablePlugin('camera')
+      pluginReady = false
+      document.getElementById('video-el').srcObject = null
+      document.getElementById('btn-plugin').textContent = 'Enable Camera Plugin'
+      document.getElementById('btn-plugin').disabled = false
+      document.getElementById('intrinsics-body').innerHTML =
+        '<tr><td colspan="2" style="color:#475569">— waiting —</td></tr>'
+      log('video-log', 'Camera plugin disabled.')
+      return
+    }
+
+    const nodeId = document.getElementById('plugin-id').value.trim()
+    if (!nodeId) { alert('Enter plugin node ID.'); return }
+
+    document.getElementById('btn-plugin').disabled = true
+    log('video-log', `Connecting to plugin "${nodeId}"…`)
+
+    try {
+      await robot.enablePluginWebrtcMqtt('camera', nodeId, { connectTimeoutSec: 30 })
+      pluginReady = true
+      document.getElementById('btn-plugin').textContent = 'Disable Camera Plugin'
+      document.getElementById('btn-plugin').disabled = false
+      log('video-log', 'Plugin connected. Requesting video track…')
+
+      // Get video track and attach to <video>
+      const track = await robot.camera.extra.getVideoTrack()
+      document.getElementById('video-el').srcObject = new MediaStream([track])
+      log('video-log', 'Streaming live camera video.')
+
+      // Fetch intrinsics
+      loadIntrinsics()
+    } catch (err) {
+      document.getElementById('btn-plugin').disabled = false
+      log('video-log', `Plugin error: ${err.message}`, true)
+    }
+  }
+
+  async function loadIntrinsics() {
+    try {
+      const data = await robot.camera.getColorIntrinsics()
+      const skip = new Set(['model', 'coeffs'])
+      const rows = Object.entries(data)
+        .filter(([k]) => !skip.has(k))
+        .map(([k, v]) => `<tr><td>${k}</td><td>${typeof v === 'number' ? v.toFixed(4) : v}</td></tr>`)
+        .join('')
+      document.getElementById('intrinsics-body').innerHTML = rows || '<tr><td colspan="2">—</td></tr>'
+    } catch (err) {
+      document.getElementById('intrinsics-body').innerHTML =
+        `<tr><td colspan="2" style="color:#ef4444">${err.message}</td></tr>`
+    }
+  }
+</script>
+</body>
+</html>

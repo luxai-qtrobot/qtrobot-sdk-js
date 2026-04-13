@@ -1,9 +1,16 @@
 import type { Robot } from '../client'
-import { WebRtcTransport } from '../transport'
-import { UnsupportedApiError } from '../transport'
+import { WebRtcTransport, UnsupportedApiError } from '../transport'
 
 export class ExtraApi {
-  constructor(private readonly _robot: Robot) {}
+  /**
+   * @param _robot          The Robot instance (used to fall back to the robot's own transport).
+   * @param _pluginTransport When set, this transport is used instead of the robot's own transport.
+   *                         Pass the plugin's WebRtcTransport when attaching to a plugin API (e.g. CameraApi).
+   */
+  constructor(
+    private readonly _robot: Robot,
+    private readonly _pluginTransport?: WebRtcTransport,
+  ) {}
 
   /**
    * Return the remote audio MediaStreamTrack received over WebRTC.
@@ -29,7 +36,7 @@ export class ExtraApi {
         'getAudioTrack() requires use_media_channels=true on the robot gateway.'
       )
     }
-    return new Promise<MediaStreamTrack>((resolve, reject) => {
+    return new Promise<MediaStreamTrack>((resolve) => {
       const cb = (track: MediaStreamTrack | Record<string, unknown>) => {
         conn.removeAudioCallback(cb)
         resolve(track as MediaStreamTrack)
@@ -62,7 +69,7 @@ export class ExtraApi {
         'getVideoTrack() requires use_media_channels=true on the robot gateway.'
       )
     }
-    return new Promise<MediaStreamTrack>((resolve, reject) => {
+    return new Promise<MediaStreamTrack>((resolve) => {
       const cb = (track: MediaStreamTrack | Record<string, unknown>) => {
         conn.removeVideoCallback(cb)
         resolve(track as MediaStreamTrack)
@@ -73,10 +80,11 @@ export class ExtraApi {
   }
 
   private _webRtcConnection() {
-    const transport = (this._robot as unknown as { _transport: unknown })._transport
+    const transport: unknown = this._pluginTransport
+      ?? (this._robot as unknown as { _transport: unknown })._transport
     if (!(transport instanceof WebRtcTransport)) {
       throw new UnsupportedApiError(
-        'robot.extra.getAudioTrack() / getVideoTrack() require a WebRTC connection.'
+        'getAudioTrack() / getVideoTrack() require a WebRTC connection.'
       )
     }
     return transport.connection

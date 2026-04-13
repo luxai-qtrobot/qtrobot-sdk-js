@@ -271,7 +271,12 @@ export class Robot {
     this._pluginTransports.set(name, transport)
 
     // Attach plugin API namespace
-    if (name === 'camera') this._camera = new CameraApi(this)
+    if (name === 'camera') {
+      const pluginExtra = transport instanceof WebRtcTransport
+        ? new ExtraApi(this, transport)
+        : new ExtraApi(this)
+      this._camera = new CameraApi(this, pluginExtra)
+    }
   }
 
   /**
