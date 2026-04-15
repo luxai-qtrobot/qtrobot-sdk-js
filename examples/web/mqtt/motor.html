@@ -37,16 +37,6 @@
       color: #94a3b8;
     }
     .stream-badge.active { background: #14532d; color: #86efac; }
-    select {
-      width: 100%;
-      padding: 7px 10px;
-      border-radius: 6px;
-      border: 1px solid #334155;
-      background: #0f1117;
-      color: #e2e8f0;
-      font-size: .88rem;
-    }
-    select:focus { outline: 2px solid #3b82f6; border-color: transparent; }
   </style>
 </head>
 <body>
@@ -59,17 +49,42 @@
   </div>
 </header>
 
-<div class="broker-bar">
-  <input id="broker-uri" type="text"
-    value="ws://10.231.0.2:9001"
-    placeholder="ws://robot-ip:9001" />
-  <input id="robot-id" class="robot-id" type="text"
-    value="QTRD000320"
-    placeholder="Robot ID" />
-  <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
-</div>
-
 <div class="grid">
+
+  <!-- ── Connection ── -->
+  <div class="card" style="grid-column: 1 / -1">
+    <h2>Connection</h2>
+    <div class="row">
+      <div style="flex:1">
+        <label>Broker URL</label>
+        <input id="broker-uri" type="text" value="ws://10.231.0.2:9001" placeholder="ws://robot-ip:9001" />
+      </div>
+      <div style="flex:0 0 160px">
+        <label>Robot ID</label>
+        <input id="robot-id" type="text" value="QTRD000320" placeholder="QTRD000000" />
+      </div>
+      <div style="align-self:flex-end">
+        <button id="btn-connect" class="primary" onclick="toggleConnect()">Connect</button>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:0 0 160px">
+        <label>Auth</label>
+        <select id="auth-mode" onchange="onAuthModeChange()">
+          <option value="none">none</option>
+          <option value="username_password">user / pass</option>
+        </select>
+      </div>
+      <div id="auth-user-wrap" style="flex:1;display:none">
+        <label>Username</label>
+        <input id="auth-username" type="text" placeholder="Username" />
+      </div>
+      <div id="auth-pass-wrap" style="flex:1;display:none">
+        <label>Password</label>
+        <input id="auth-password" type="password" placeholder="Password" />
+      </div>
+    </div>
+  </div>
 
   <!-- ── Motor control ── -->
   <div class="card">
@@ -148,6 +163,7 @@
 </div>
 
 <script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script src="mqtt-connect.js"></script>
 <script>
   const { Robot, JointCommandFrame } = QTRobotSDK
 
@@ -190,7 +206,7 @@
 
     setStatus('connecting')
     try {
-      robot = await Robot.connectMqtt(broker, robotId, { connectTimeoutSec: 15 })
+      robot = await Robot.connectMqtt(broker, robotId, buildMqttConnectOptions())
       setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
     } catch (err) {
       setStatus('disconnected')

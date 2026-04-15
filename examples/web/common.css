@@ -80,7 +80,7 @@ header h1 span { color: #60a5fa; }
 
 label { font-size: .8rem; color: #94a3b8; margin-bottom: 2px; display: block; }
 
-input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"], input[type="password"] {
   width: 100%;
   padding: 7px 10px;
   border-radius: 6px;
@@ -90,6 +90,17 @@ input[type="text"], input[type="number"] {
   font-size: .88rem;
 }
 input:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+
+select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f1117;
+  color: #e2e8f0;
+  font-size: .88rem;
+}
+select:focus { outline: 2px solid #3b82f6; border-color: transparent; }
 
 button {
   padding: 8px 18px;
