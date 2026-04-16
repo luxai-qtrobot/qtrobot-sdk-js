@@ -70,50 +70,56 @@ export class MediaApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<boolean>('/media/audio/fg/file/play', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/audio/fg/file/cancel', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/media/audio/fg/file/cancel', {}))
   }
 
   /**
    * Pause the foreground audio file currently playing.
+   * @returns unknown
    */
-  async pauseFgAudioFile(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/file/pause', {})
+  async pauseFgAudioFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/file/pause', {})
   }
 
   /**
    * Resume the paused foreground audio file.
+   * @returns unknown
    */
-  async resumeFgAudioFile(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/file/resume', {})
+  async resumeFgAudioFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/file/resume', {})
   }
 
   /**
    * Cancel the active foreground audio stream.
+   * @returns unknown
    */
-  async cancelFgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/cancel', {})
+  async cancelFgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/stream/cancel', {})
   }
 
   /**
    * Pause the foreground audio stream.
+   * @returns unknown
    */
-  async pauseFgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/pause', {})
+  async pauseFgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/stream/pause', {})
   }
 
   /**
    * Resume the paused foreground audio stream.
+   * @returns unknown
    */
-  async resumeFgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/stream/resume', {})
+  async resumeFgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/stream/resume', {})
   }
 
   /**
    * Set the foreground audio playback volume.
    * @param options.value Volume level in [0.0, 1.0].
+   * @returns unknown
    */
-  async setFgAudioVolume(options: MediaSetFgAudioVolumeOptions): Promise<void> {
-    await this._robot.rpcCall('/media/audio/fg/volume/set', options as Record<string, unknown>)
+  async setFgAudioVolume(options: MediaSetFgAudioVolumeOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/fg/volume/set', options as Record<string, unknown>)
   }
 
   /**
@@ -134,50 +140,56 @@ export class MediaApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<boolean>('/media/audio/bg/file/play', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/audio/bg/file/cancel', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/media/audio/bg/file/cancel', {}))
   }
 
   /**
    * Pause the background audio file currently playing.
+   * @returns unknown
    */
-  async pauseBgAudioFile(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/file/pause', {})
+  async pauseBgAudioFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/file/pause', {})
   }
 
   /**
    * Resume the paused background audio file.
+   * @returns unknown
    */
-  async resumeBgAudioFile(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/file/resume', {})
+  async resumeBgAudioFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/file/resume', {})
   }
 
   /**
    * Cancel the active background audio stream.
+   * @returns unknown
    */
-  async cancelBgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/cancel', {})
+  async cancelBgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/stream/cancel', {})
   }
 
   /**
    * Pause the background audio stream.
+   * @returns unknown
    */
-  async pauseBgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/pause', {})
+  async pauseBgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/stream/pause', {})
   }
 
   /**
    * Resume the paused background audio stream.
+   * @returns unknown
    */
-  async resumeBgAudioStream(): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/stream/resume', {})
+  async resumeBgAudioStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/stream/resume', {})
   }
 
   /**
    * Set the background audio playback volume.
    * @param options.value Volume level in [0.0, 1.0].
+   * @returns unknown
    */
-  async setBgAudioVolume(options: MediaSetBgAudioVolumeOptions): Promise<void> {
-    await this._robot.rpcCall('/media/audio/bg/volume/set', options as Record<string, unknown>)
+  async setBgAudioVolume(options: MediaSetBgAudioVolumeOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/audio/bg/volume/set', options as Record<string, unknown>)
   }
 
   /**
@@ -200,50 +212,56 @@ export class MediaApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<boolean>('/media/video/fg/file/play', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/video/fg/file/cancel', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/media/video/fg/file/cancel', {}))
   }
 
   /**
    * Pause the foreground video file currently playing.
+   * @returns unknown
    */
-  async pauseFgVideoFile(): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/file/pause', {})
+  async pauseFgVideoFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/file/pause', {})
   }
 
   /**
    * Resume the paused foreground video file.
+   * @returns unknown
    */
-  async resumeFgVideoFile(): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/file/resume', {})
+  async resumeFgVideoFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/file/resume', {})
   }
 
   /**
    * Cancel the active foreground video stream.
+   * @returns unknown
    */
-  async cancelFgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/cancel', {})
+  async cancelFgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/stream/cancel', {})
   }
 
   /**
    * Pause the foreground video stream.
+   * @returns unknown
    */
-  async pauseFgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/pause', {})
+  async pauseFgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/stream/pause', {})
   }
 
   /**
    * Resume the paused foreground video stream.
+   * @returns unknown
    */
-  async resumeFgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/stream/resume', {})
+  async resumeFgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/stream/resume', {})
   }
 
   /**
    * Set the foreground video layer transparency.
    * @param options.value Alpha transparency in [0.0, 1.0].
+   * @returns unknown
    */
-  async setFgVideoAlpha(options: MediaSetFgVideoAlphaOptions): Promise<void> {
-    await this._robot.rpcCall('/media/video/fg/set_alpha', options as Record<string, unknown>)
+  async setFgVideoAlpha(options: MediaSetFgVideoAlphaOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/fg/set_alpha', options as Record<string, unknown>)
   }
 
   /**
@@ -258,42 +276,47 @@ export class MediaApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<boolean>('/media/video/bg/file/play', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/media/video/bg/file/cancel', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/media/video/bg/file/cancel', {}))
   }
 
   /**
    * Pause the background video file currently playing.
+   * @returns unknown
    */
-  async pauseBgVideoFile(): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/file/pause', {})
+  async pauseBgVideoFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/bg/file/pause', {})
   }
 
   /**
    * Resume the paused background video file.
+   * @returns unknown
    */
-  async resumeBgVideoFile(): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/file/resume', {})
+  async resumeBgVideoFile(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/bg/file/resume', {})
   }
 
   /**
    * Cancel the active background video stream.
+   * @returns unknown
    */
-  async cancelBgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/cancel', {})
+  async cancelBgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/bg/stream/cancel', {})
   }
 
   /**
    * Pause the background video stream.
+   * @returns unknown
    */
-  async pauseBgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/pause', {})
+  async pauseBgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/bg/stream/pause', {})
   }
 
   /**
    * Resume the paused background video stream.
+   * @returns unknown
    */
-  async resumeBgVideoStream(): Promise<void> {
-    await this._robot.rpcCall('/media/video/bg/stream/resume', {})
+  async resumeBgVideoStream(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/media/video/bg/stream/resume', {})
   }
 
   /**

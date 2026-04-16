@@ -80,12 +80,13 @@ export class TtsApi {
    * @param options.volume Volume level.
    * @param options.style Speaking style (engine-dependent).
    * @param options.signal AbortSignal to cancel the operation.
+   * @returns unknown
    */
-  async sayText(options: TtsSayTextOptions): Promise<void> {
+  async sayText(options: TtsSayTextOptions): Promise<unknown> {
     const { signal, ...args } = options
-    const rpc = this._robot.rpcCall<void>('/tts/engine/say/text', args as Record<string, unknown>)
-    if (!signal) { await rpc; return }
-    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/tts/engine/cancel', {}))
+    const rpc = this._robot.rpcCall<unknown>('/tts/engine/say/text', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/tts/engine/cancel', {}))
   }
 
   /**
@@ -93,20 +94,22 @@ export class TtsApi {
    * @param options.ssml SSML markup string.
    * @param options.engine Engine id (uses default if omitted).
    * @param options.signal AbortSignal to cancel the operation.
+   * @returns unknown
    */
-  async saySsml(options: TtsSaySsmlOptions): Promise<void> {
+  async saySsml(options: TtsSaySsmlOptions): Promise<unknown> {
     const { signal, ...args } = options
-    const rpc = this._robot.rpcCall<void>('/tts/engine/say/ssml', args as Record<string, unknown>)
-    if (!signal) { await rpc; return }
-    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/tts/engine/cancel', {}))
+    const rpc = this._robot.rpcCall<unknown>('/tts/engine/say/ssml', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/tts/engine/cancel', {}))
   }
 
   /**
    * Set the default TTS engine.
    * @param options.engine Engine id, e.g. "acapela" or "azure".
+   * @returns unknown
    */
-  async setDefaultEngine(options: TtsSetDefaultEngineOptions): Promise<void> {
-    await this._robot.rpcCall('/tts/default_engine/set', options as Record<string, unknown>)
+  async setDefaultEngine(options: TtsSetDefaultEngineOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/tts/default_engine/set', options as Record<string, unknown>)
   }
 
   /**
@@ -129,9 +132,10 @@ export class TtsApi {
    * Set engine configuration.
    * @param options.config Engine-specific config key/value pairs.
    * @param options.engine Engine id (uses default if omitted).
+   * @returns unknown
    */
-  async setConfig(options: TtsSetConfigOptions): Promise<void> {
-    await this._robot.rpcCall('/tts/engine/configure/set', options as Record<string, unknown>)
+  async setConfig(options: TtsSetConfigOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/tts/engine/configure/set', options as Record<string, unknown>)
   }
 
   /**

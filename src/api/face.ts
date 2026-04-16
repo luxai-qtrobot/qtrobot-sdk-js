@@ -30,12 +30,13 @@ export class FaceApi {
    * @param options.emotion Emotion name or relative path (with or without .avi).
    * @param options.speed Playback speed factor (uses config default if omitted).
    * @param options.signal AbortSignal to cancel the operation.
+   * @returns unknown
    */
-  async showEmotion(options: FaceShowEmotionOptions): Promise<void> {
+  async showEmotion(options: FaceShowEmotionOptions): Promise<unknown> {
     const { signal, ...args } = options
-    const rpc = this._robot.rpcCall<void>('/face/emotion/show', args as Record<string, unknown>)
-    if (!signal) { await rpc; return }
-    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/face/emotion/stop', {}))
+    const rpc = this._robot.rpcCall<unknown>('/face/emotion/show', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/face/emotion/stop', {}))
   }
 
   /**
@@ -51,9 +52,10 @@ export class FaceApi {
    * @param options.l_eye [dx, dy] pixel offset from centre for the left eye.
    * @param options.r_eye [dx, dy] pixel offset from centre for the right eye.
    * @param options.duration If > 0, eyes reset to centre after this many seconds.
+   * @returns unknown
    */
-  async look(options: FaceLookOptions): Promise<void> {
-    await this._robot.rpcCall('/face/look', options as Record<string, unknown>)
+  async look(options: FaceLookOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/face/look', options as Record<string, unknown>)
   }
 
 }

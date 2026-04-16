@@ -15,7 +15,7 @@ export class RobotApiError extends Error {
 export async function withSignal<T>(
   promise: Promise<T>,
   signal: AbortSignal,
-  onAbort?: () => Promise<void>,
+  onAbort?: () => Promise<unknown>,
 ): Promise<T> {
   if (signal.aborted) {
     await onAbort?.().catch(e => Logger.warning(`withSignal: cancel RPC failed: ${e}`))

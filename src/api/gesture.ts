@@ -61,12 +61,13 @@ export class GestureApi {
    * @param options.rate_hz Resample rate in Hz.
    * @param options.speed_factor Playback speed multiplier.
    * @param options.signal AbortSignal to cancel the operation.
+   * @returns unknown
    */
-  async play(options: GesturePlayOptions): Promise<void> {
+  async play(options: GesturePlayOptions): Promise<unknown> {
     const { signal, ...args } = options
-    const rpc = this._robot.rpcCall<void>('/gesture/play', args as Record<string, unknown>)
-    if (!signal) { await rpc; return }
-    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('/gesture/cancel', {}))
+    const rpc = this._robot.rpcCall<unknown>('/gesture/play', args as Record<string, unknown>)
+    if (!signal) return rpc
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/gesture/cancel', {}))
   }
 
   /**
@@ -80,7 +81,7 @@ export class GestureApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<boolean>('/gesture/file/play', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/gesture/cancel', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/gesture/cancel', {}))
   }
 
   /**
@@ -107,7 +108,7 @@ export class GestureApi {
     const { signal, ...args } = options
     const rpc = this._robot.rpcCall<Record<string, unknown>>('/gesture/record/start', args as Record<string, unknown>)
     if (!signal) return rpc
-    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('/gesture/record/stop', {}))
+    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('/gesture/record/stop', {}))
   }
 
   /**
@@ -121,9 +122,10 @@ export class GestureApi {
   /**
    * Save the last recorded gesture to a file.
    * @param options.gesture Name or relative path to save the recorded gesture as XML.
+   * @returns unknown
    */
-  async storeRecord(options: GestureStoreRecordOptions): Promise<void> {
-    await this._robot.rpcCall('/gesture/record/store', options as Record<string, unknown>)
+  async storeRecord(options: GestureStoreRecordOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/gesture/record/store', options as Record<string, unknown>)
   }
 
   /**

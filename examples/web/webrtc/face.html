@@ -231,8 +231,8 @@
     log('emotion-log', `Showing "${emotion}" (speed=${speed})…`)
 
     try {
-      await robot.face.showEmotion({ emotion, speed, signal: showController.signal })
-      log('emotion-log', `Done: "${emotion}"`)
+      const ret = await robot.face.showEmotion({ emotion, speed, signal: showController.signal })
+      log('emotion-log', `Done: "${emotion}" → ${JSON.stringify(ret)}`)
     } catch (err) {
       if (err.name === 'AbortError' || err.message?.includes('cancel')) {
         log('emotion-log', `Cancelled: "${emotion}"`)
@@ -259,8 +259,8 @@
     const dur = parseFloat(document.getElementById('look-dur').value) ?? 2
     log('look-log', `Looking to (${x}, ${y}) for ${dur}s…`)
     try {
-      await robot.face.look({ l_eye: [x, y], r_eye: [x, y], duration: dur })
-      log('look-log', `Done.`)
+      const ret = await robot.face.look({ l_eye: [x, y], r_eye: [x, y], duration: dur })
+      log('look-log', `Done. → ${JSON.stringify(ret)}`)
     } catch (err) {
       log('look-log', `Error: ${err.message}`, true)
     }
@@ -269,8 +269,8 @@
   async function doCenter() {
     log('look-log', 'Centering eyes…')
     try {
-      await robot.face.look({ l_eye: [0, 0], r_eye: [0, 0], duration: 0 })
-      log('look-log', 'Eyes centred.')
+      const ret = await robot.face.look({ l_eye: [0, 0], r_eye: [0, 0], duration: 0 })
+      log('look-log', `Eyes centred. → ${JSON.stringify(ret)}`)
     } catch (err) {
       log('look-log', `Error: ${err.message}`, true)
     }

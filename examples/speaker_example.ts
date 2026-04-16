@@ -28,13 +28,13 @@ async function setVolume(robot: Robot) {
 
 async function muteUnmute(robot: Robot) {
   Logger.info('Muting speaker...')
-  await robot.speaker.mute()
-  Logger.info('Speaker muted. Waiting 2 seconds...')
+  const muteRet = await robot.speaker.mute()
+  Logger.info(`Speaker muted. response: ${JSON.stringify(muteRet)}. Waiting 2 seconds...`)
   await new Promise(r => setTimeout(r, 2000))
 
   Logger.info('Unmuting speaker...')
-  await robot.speaker.unmute()
-  Logger.info('Speaker unmuted.')
+  const unmuteRet = await robot.speaker.unmute()
+  Logger.info(`Speaker unmuted. response: ${JSON.stringify(unmuteRet)}`)
 }
 
 void [setVolume, muteUnmute]

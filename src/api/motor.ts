@@ -55,55 +55,62 @@ export class MotorApi {
   /**
    * Enable torque for a motor.
    * @param options.motor Motor name to enable torque.
+   * @returns unknown
    */
-  async on(options: MotorOnOptions): Promise<void> {
-    await this._robot.rpcCall('/motor/on', options as Record<string, unknown>)
+  async on(options: MotorOnOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/on', options as Record<string, unknown>)
   }
 
   /**
    * Disable torque for a motor.
    * @param options.motor Motor name to disable torque.
+   * @returns unknown
    */
-  async off(options: MotorOffOptions): Promise<void> {
-    await this._robot.rpcCall('/motor/off', options as Record<string, unknown>)
+  async off(options: MotorOffOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/off', options as Record<string, unknown>)
   }
 
   /**
    * Enable torque for all motors.
+   * @returns unknown
    */
-  async onAll(): Promise<void> {
-    await this._robot.rpcCall('/motor/on/all', {})
+  async onAll(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/on/all', {})
   }
 
   /**
    * Disable torque for all motors.
+   * @returns unknown
    */
-  async offAll(): Promise<void> {
-    await this._robot.rpcCall('/motor/off/all', {})
+  async offAll(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/off/all', {})
   }
 
   /**
    * Move a motor to its home position.
    * @param options.motor Motor name to move to its home position.
+   * @returns unknown
    */
-  async home(options: MotorHomeOptions): Promise<void> {
-    await this._robot.rpcCall('/motor/move/home', options as Record<string, unknown>)
+  async home(options: MotorHomeOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/move/home', options as Record<string, unknown>)
   }
 
   /**
    * Move all motors to their home positions.
+   * @returns unknown
    */
-  async homeAll(): Promise<void> {
-    await this._robot.rpcCall('/motor/move/home/all', {})
+  async homeAll(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/move/home/all', {})
   }
 
   /**
    * Set the velocity limit for a motor.
    * @param options.motor Motor name.
    * @param options.velocity Velocity value (0 .. velocity_max).
+   * @returns unknown
    */
-  async setVelocity(options: MotorSetVelocityOptions): Promise<void> {
-    await this._robot.rpcCall('/motor/velocity/set', options as Record<string, unknown>)
+  async setVelocity(options: MotorSetVelocityOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/velocity/set', options as Record<string, unknown>)
   }
 
   /**
@@ -113,16 +120,18 @@ export class MotorApi {
    * @param options.overload_threshold Overload threshold value.
    * @param options.velocity_max Maximum velocity value.
    * @param options.store Persist the calibration to config file.
+   * @returns unknown
    */
-  async setCalib(options: MotorSetCalibOptions): Promise<void> {
-    await this._robot.rpcCall('/motor/calib/set', options as Record<string, unknown>)
+  async setCalib(options: MotorSetCalibOptions): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/calib/set', options as Record<string, unknown>)
   }
 
   /**
    * Apply stored calibration to all motors.
+   * @returns unknown
    */
-  async calibAll(): Promise<void> {
-    await this._robot.rpcCall('/motor/calib/all', {})
+  async calibAll(): Promise<unknown> {
+    return this._robot.rpcCall<unknown>('/motor/calib/all', {})
   }
 
   /**

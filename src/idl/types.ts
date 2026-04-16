@@ -18,7 +18,7 @@ export type ParamDef = {
   doc: string
 }
 
-export type ReturnType = 'void' | 'boolean' | 'number' | 'string' | 'object' | 'array' | 'unknown'
+export type ReturnType = 'boolean' | 'number' | 'string' | 'object' | 'array' | 'unknown'
 
 export type RpcEntry = {
   /** Canonical service path on the robot, e.g. '/tts/engine/say/text' */

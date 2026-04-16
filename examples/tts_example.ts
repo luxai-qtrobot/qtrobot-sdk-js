@@ -21,27 +21,32 @@ async function getSetDefaultEngine(robot: Robot) {
   Logger.info(`Current default TTS engine: ${engine}`)
 
   Logger.info("Setting default TTS engine to 'acapela'...")
-  await robot.tts.setDefaultEngine({ engine: 'acapela' })
+  const ret = await robot.tts.setDefaultEngine({ engine: 'acapela' })
+  Logger.info(`Done. response: ${JSON.stringify(ret)}`)
 }
 
 async function sayText(robot: Robot) {
   // Say a simple phrase using the default engine
   Logger.info('Saying text with default engine...')
-  await robot.tts.sayText({ text: 'Hello, this is spoken with the default settings.' })
+  const ret1 = await robot.tts.sayText({ text: 'Hello, this is spoken with the default settings.' })
+  Logger.info(`Done. response: ${JSON.stringify(ret1)}`)
 
   // With rate and pitch adjustments
   Logger.info('Saying text with rate and pitch adjustments...')
-  await robot.tts.sayText({ text: 'This is spoken slower at a higher pitch.', engine: 'acapela', rate: 0.85, pitch: 1.2 })
+  const ret2 = await robot.tts.sayText({ text: 'This is spoken slower at a higher pitch.', engine: 'acapela', rate: 0.85, pitch: 1.2 })
+  Logger.info(`Done. response: ${JSON.stringify(ret2)}`)
 
   // With explicit voice
   Logger.info('Saying text with voice override...')
-  await robot.tts.sayText({ text: 'This is spoken with the Rosie voice.', engine: 'acapela', voice: 'Rosie' })
+  const ret3 = await robot.tts.sayText({ text: 'This is spoken with the Rosie voice.', engine: 'acapela', voice: 'Rosie' })
+  Logger.info(`Done. response: ${JSON.stringify(ret3)}`)
 
   // With inline Acapela speed tags
-  await robot.tts.sayText({
+  const ret4 = await robot.tts.sayText({
     text: 'I will speak with different speed. \\rspd=130\\ Now I am speaking faster. \\rspd=70\\ And now I am speaking slower.',
     engine: 'acapela',
   })
+  Logger.info(`Done. response: ${JSON.stringify(ret4)}`)
 }
 
 async function sayTextCancel(robot: Robot) {
@@ -77,8 +82,8 @@ async function saySsmlAzure(robot: Robot) {
   ].join('\n')
 
   Logger.info('Saying SSML with azure engine...')
-  await robot.tts.saySsml({ ssml, engine: 'azure' })
-  Logger.info('Done.')
+  const ret = await robot.tts.saySsml({ ssml, engine: 'azure' })
+  Logger.info(`Done. response: ${JSON.stringify(ret)}`)
 }
 
 async function checkSsmlSupport(robot: Robot) {
@@ -105,8 +110,8 @@ async function engineConfig(robot: Robot) {
   Logger.info(`acapela config: ${JSON.stringify(cfg)}`)
 
   Logger.info('Configuring acapela engine with pitch and rate adjustments...')
-  await robot.tts.setConfig({ config: { pitch: 1.0, rate: 0.8 }, engine: 'acapela' })
-  Logger.info('Config updated.')
+  const ret = await robot.tts.setConfig({ config: { pitch: 1.0, rate: 0.8 }, engine: 'acapela' })
+  Logger.info(`Config updated. response: ${JSON.stringify(ret)}`)
 }
 
 void [getSetDefaultEngine, sayText, sayTextCancel, saySsmlAzure, checkSsmlSupport, engineConfig]

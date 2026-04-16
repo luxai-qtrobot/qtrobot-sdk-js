@@ -22,7 +22,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'volume', type: 'number',  optional: true, default: null, doc: 'Volume level.' },
       { name: 'style',  type: 'string',  optional: true, default: null, doc: 'Speaking style (engine-dependent).' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Speak plain text. Blocks until audio playback completes.',
   },
 
@@ -33,7 +33,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'ssml',   type: 'string', doc: 'SSML markup string.' },
       { name: 'engine', type: 'string', optional: true, default: null, doc: 'Engine id (uses default if omitted).' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Speak SSML markup. Blocks until audio playback completes.',
   },
 
@@ -42,7 +42,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
     params: [
       { name: 'engine', type: 'string', doc: 'Engine id, e.g. "acapela" or "azure".' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set the default TTS engine.',
   },
 
@@ -66,7 +66,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'config', type: 'object', doc: 'Engine-specific config key/value pairs.' },
       { name: 'engine', type: 'string', optional: true, default: null, doc: 'Engine id (uses default if omitted).' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set engine configuration.',
   },
 
@@ -115,7 +115,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'emotion', type: 'string', doc: 'Emotion name or relative path (with or without .avi).' },
       { name: 'speed',   type: 'number', optional: true, default: null, doc: 'Playback speed factor (uses config default if omitted).' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Show an emotion animation on the robot face. Blocks until the animation finishes.',
   },
 
@@ -133,7 +133,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'r_eye',    type: 'array',  doc: '[dx, dy] pixel offset from centre for the right eye.' },
       { name: 'duration', type: 'number', optional: true, default: 0.0, doc: 'If > 0, eyes reset to centre after this many seconds.' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Move the robot eyes.',
   },
 
@@ -148,7 +148,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'rate_hz',       type: 'number',  optional: true, default: 100.0, doc: 'Resample rate in Hz.' },
       { name: 'speed_factor',  type: 'number',  optional: true, default: 1.0,   doc: 'Playback speed multiplier.' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Play a gesture from keyframe data. Blocks until the gesture finishes.',
   },
 
@@ -198,7 +198,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
     params: [
       { name: 'gesture', type: 'string', doc: 'Name or relative path to save the recorded gesture as XML.' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Save the last recorded gesture to a file.',
   },
 
@@ -214,42 +214,42 @@ export const CORE_RPC: Record<string, RpcEntry> = {
   'motor.on': {
     service: '/motor/on',
     params: [{ name: 'motor', type: 'string', doc: 'Motor name to enable torque.' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Enable torque for a motor.',
   },
 
   'motor.off': {
     service: '/motor/off',
     params: [{ name: 'motor', type: 'string', doc: 'Motor name to disable torque.' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Disable torque for a motor.',
   },
 
   'motor.on_all': {
     service: '/motor/on/all',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Enable torque for all motors.',
   },
 
   'motor.off_all': {
     service: '/motor/off/all',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Disable torque for all motors.',
   },
 
   'motor.home': {
     service: '/motor/move/home',
     params: [{ name: 'motor', type: 'string', doc: 'Motor name to move to its home position.' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Move a motor to its home position.',
   },
 
   'motor.home_all': {
     service: '/motor/move/home/all',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Move all motors to their home positions.',
   },
 
@@ -259,7 +259,7 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'motor',    type: 'string', doc: 'Motor name.' },
       { name: 'velocity', type: 'number', doc: 'Velocity value (0 .. velocity_max).' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set the velocity limit for a motor.',
   },
 
@@ -272,14 +272,14 @@ export const CORE_RPC: Record<string, RpcEntry> = {
       { name: 'velocity_max',       type: 'number',  optional: true, default: null,  doc: 'Maximum velocity value.' },
       { name: 'store',              type: 'boolean', optional: true, default: false, doc: 'Persist the calibration to config file.' },
     ],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set calibration parameters for a motor.',
   },
 
   'motor.calib_all': {
     service: '/motor/calib/all',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Apply stored calibration to all motors.',
   },
 
@@ -315,42 +315,42 @@ export const CORE_RPC: Record<string, RpcEntry> = {
   'media.pause_fg_audio_file': {
     service: '/media/audio/fg/file/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the foreground audio file currently playing.',
   },
 
   'media.resume_fg_audio_file': {
     service: '/media/audio/fg/file/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused foreground audio file.',
   },
 
   'media.cancel_fg_audio_stream': {
     service: '/media/audio/fg/stream/cancel',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Cancel the active foreground audio stream.',
   },
 
   'media.pause_fg_audio_stream': {
     service: '/media/audio/fg/stream/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the foreground audio stream.',
   },
 
   'media.resume_fg_audio_stream': {
     service: '/media/audio/fg/stream/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused foreground audio stream.',
   },
 
   'media.set_fg_audio_volume': {
     service: '/media/audio/fg/volume/set',
     params: [{ name: 'value', type: 'number', doc: 'Volume level in [0.0, 1.0].' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set the foreground audio playback volume.',
   },
 
@@ -374,42 +374,42 @@ export const CORE_RPC: Record<string, RpcEntry> = {
   'media.pause_bg_audio_file': {
     service: '/media/audio/bg/file/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the background audio file currently playing.',
   },
 
   'media.resume_bg_audio_file': {
     service: '/media/audio/bg/file/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused background audio file.',
   },
 
   'media.cancel_bg_audio_stream': {
     service: '/media/audio/bg/stream/cancel',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Cancel the active background audio stream.',
   },
 
   'media.pause_bg_audio_stream': {
     service: '/media/audio/bg/stream/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the background audio stream.',
   },
 
   'media.resume_bg_audio_stream': {
     service: '/media/audio/bg/stream/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused background audio stream.',
   },
 
   'media.set_bg_audio_volume': {
     service: '/media/audio/bg/volume/set',
     params: [{ name: 'value', type: 'number', doc: 'Volume level in [0.0, 1.0].' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set the background audio playback volume.',
   },
 
@@ -437,42 +437,42 @@ export const CORE_RPC: Record<string, RpcEntry> = {
   'media.pause_fg_video_file': {
     service: '/media/video/fg/file/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the foreground video file currently playing.',
   },
 
   'media.resume_fg_video_file': {
     service: '/media/video/fg/file/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused foreground video file.',
   },
 
   'media.cancel_fg_video_stream': {
     service: '/media/video/fg/stream/cancel',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Cancel the active foreground video stream.',
   },
 
   'media.pause_fg_video_stream': {
     service: '/media/video/fg/stream/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the foreground video stream.',
   },
 
   'media.resume_fg_video_stream': {
     service: '/media/video/fg/stream/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused foreground video stream.',
   },
 
   'media.set_fg_video_alpha': {
     service: '/media/video/fg/set_alpha',
     params: [{ name: 'value', type: 'number', doc: 'Alpha transparency in [0.0, 1.0].' }],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Set the foreground video layer transparency.',
   },
 
@@ -493,35 +493,35 @@ export const CORE_RPC: Record<string, RpcEntry> = {
   'media.pause_bg_video_file': {
     service: '/media/video/bg/file/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the background video file currently playing.',
   },
 
   'media.resume_bg_video_file': {
     service: '/media/video/bg/file/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused background video file.',
   },
 
   'media.cancel_bg_video_stream': {
     service: '/media/video/bg/stream/cancel',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Cancel the active background video stream.',
   },
 
   'media.pause_bg_video_stream': {
     service: '/media/video/bg/stream/pause',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Pause the background video stream.',
   },
 
   'media.resume_bg_video_stream': {
     service: '/media/video/bg/stream/resume',
     params: [],
-    returns: 'void',
+    returns: 'unknown',
     doc: 'Resume the paused background video stream.',
   },
 

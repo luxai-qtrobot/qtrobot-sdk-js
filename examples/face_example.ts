@@ -22,13 +22,13 @@ async function listEmotions(robot: Robot) {
 async function showEmotion(robot: Robot) {
   // Play an emotion and wait for it to finish
   Logger.info("Showing 'QT/kiss' emotion...")
-  await robot.face.showEmotion({ emotion: 'QT/kiss' })
-  Logger.info('Done.')
+  const ret1 = await robot.face.showEmotion({ emotion: 'QT/kiss' })
+  Logger.info(`Done. response: ${JSON.stringify(ret1)}`)
 
   // Play an emotion at 2× speed
   Logger.info("Showing 'QT/surprise' at 2× speed...")
-  await robot.face.showEmotion({ emotion: 'QT/surprise', speed: 2.0 })
-  Logger.info('Done.')
+  const ret2 = await robot.face.showEmotion({ emotion: 'QT/surprise', speed: 2.0 })
+  Logger.info(`Done. response: ${JSON.stringify(ret2)}`)
 }
 
 async function showEmotionCancel(robot: Robot) {
@@ -56,18 +56,20 @@ async function showEmotionCancel(robot: Robot) {
 async function lookEyes(robot: Robot) {
   // Move both eyes to the right
   Logger.info('Looking right...')
-  await robot.face.look({ l_eye: [30, 0], r_eye: [30, 0] })
+  const ret1 = await robot.face.look({ l_eye: [30, 0], r_eye: [30, 0] })
+  Logger.info(`Done. response: ${JSON.stringify(ret1)}`)
   await new Promise(r => setTimeout(r, 1000))
 
   // Move eyes up-left
   Logger.info('Looking up-left...')
-  await robot.face.look({ l_eye: [-20, -20], r_eye: [-20, -20] })
+  const ret2 = await robot.face.look({ l_eye: [-20, -20], r_eye: [-20, -20] })
+  Logger.info(`Done. response: ${JSON.stringify(ret2)}`)
   await new Promise(r => setTimeout(r, 1000))
 
   // Move eyes down, auto-reset to centre after 3 seconds
   Logger.info('Looking down, auto-reset in 3s...')
-  await robot.face.look({ l_eye: [0, 20], r_eye: [0, 20], duration: 3.0 })
-  Logger.info('Eyes back to centre.')
+  const ret3 = await robot.face.look({ l_eye: [0, 20], r_eye: [0, 20], duration: 3.0 })
+  Logger.info(`Eyes back to centre. response: ${JSON.stringify(ret3)}`)
 }
 
 void [showEmotion, showEmotionCancel, lookEyes]

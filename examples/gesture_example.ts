@@ -65,8 +65,8 @@ async function recordGesture(robot: Robot) {
 
   Logger.info('Playing back the recorded gesture in 2 seconds...')
   await new Promise(r => setTimeout(r, 2000))
-  await robot.gesture.play({ keyframes })
-  Logger.info('Playback done.')
+  const playRet = await robot.gesture.play({ keyframes })
+  Logger.info(`Playback done. response: ${JSON.stringify(playRet)}`)
 
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   const answer = await new Promise<string>(resolve => rl.question('Save gesture? (y/n): ', resolve))
@@ -75,8 +75,8 @@ async function recordGesture(robot: Robot) {
     const rl2 = createInterface({ input: process.stdin, output: process.stdout })
     const name = await new Promise<string>(resolve => rl2.question('Gesture name: ', resolve))
     rl2.close()
-    await robot.gesture.storeRecord({ gesture: name })
-    Logger.info(`Gesture '${name}' stored.`)
+    const storeRet = await robot.gesture.storeRecord({ gesture: name })
+    Logger.info(`Gesture '${name}' stored. response: ${JSON.stringify(storeRet)}`)
   }
 }
 

@@ -30,7 +30,6 @@ function idlParamToTs(type: string): string {
 
 function idlReturnToTs(type: string): string {
   switch (type) {
-    case 'void':    return 'void'
     case 'boolean': return 'boolean'
     case 'number':  return 'number'
     case 'string':  return 'string'
@@ -217,46 +216,26 @@ function generateNs(
         lines.push(`   * @param options.signal AbortSignal to cancel the operation.`)
       }
     }
-    if (retTs !== 'void') {
-      lines.push(`   * @returns ${retTs}`)
-    }
+    lines.push(`   * @returns ${retTs}`)
     lines.push(`   */`)
 
     if (!hasParams) {
       // No-params method — plain, no options object
-      if (retTs === 'void') {
-        lines.push(`  async ${methodName}(): Promise<void> {`)
-        lines.push(`    await this._robot.rpcCall('${entry.service}', {})`)
-      } else {
-        lines.push(`  async ${methodName}(): Promise<${retTs}> {`)
-        lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', {})`)
-      }
+      lines.push(`  async ${methodName}(): Promise<${retTs}> {`)
+      lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', {})`)
       lines.push(`  }`)
     } else if (!entry.cancel) {
       // Non-cancellable with params
-      if (retTs === 'void') {
-        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<void> {`)
-        lines.push(`    await this._robot.rpcCall('${entry.service}', options as Record<string, unknown>)`)
-      } else {
-        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
-        lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', options as Record<string, unknown>)`)
-      }
+      lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
+      lines.push(`    return this._robot.rpcCall<${retTs}>('${entry.service}', options as Record<string, unknown>)`)
       lines.push(`  }`)
     } else {
       // Cancellable with params — signal goes in options
-      if (retTs === 'void') {
-        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<void> {`)
-        lines.push(`    const { signal, ...args } = options`)
-        lines.push(`    const rpc = this._robot.rpcCall<void>('${entry.service}', args as Record<string, unknown>)`)
-        lines.push(`    if (!signal) { await rpc; return }`)
-        lines.push(`    await withSignal(rpc, signal, () => this._robot.rpcCall<void>('${entry.cancel}', {}))`)
-      } else {
-        lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
-        lines.push(`    const { signal, ...args } = options`)
-        lines.push(`    const rpc = this._robot.rpcCall<${retTs}>('${entry.service}', args as Record<string, unknown>)`)
-        lines.push(`    if (!signal) return rpc`)
-        lines.push(`    return withSignal(rpc, signal, () => this._robot.rpcCall<void>('${entry.cancel}', {}))`)
-      }
+      lines.push(`  async ${methodName}(options: ${optTypeName}): Promise<${retTs}> {`)
+      lines.push(`    const { signal, ...args } = options`)
+      lines.push(`    const rpc = this._robot.rpcCall<${retTs}>('${entry.service}', args as Record<string, unknown>)`)
+      lines.push(`    if (!signal) return rpc`)
+      lines.push(`    return withSignal(rpc, signal, () => this._robot.rpcCall<unknown>('${entry.cancel}', {}))`)
       lines.push(`  }`)
     }
     lines.push(``)

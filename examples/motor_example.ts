@@ -60,8 +60,8 @@ async function main() {
 
   // ---- 6. Home all motors ----
   Logger.info('Homing all motors...')
-  await robot.motor.homeAll()
-  Logger.info('All motors homed.')
+  const homeRet = await robot.motor.homeAll()
+  Logger.info(`All motors homed. response: ${JSON.stringify(homeRet)}`)
 
   robot.close()
 }

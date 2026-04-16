@@ -247,8 +247,8 @@
     log('say-log', `Speaking${engine ? ` [${engine}]` : ''}…`)
 
     try {
-      await robot.tts.sayText({ text, engine, voice, rate, pitch, signal: sayController.signal })
-      log('say-log', 'Done.')
+      const ret = await robot.tts.sayText({ text, engine, voice, rate, pitch, signal: sayController.signal })
+      log('say-log', `Done. → ${JSON.stringify(ret)}`)
     } catch (err) {
       if (err.name === 'AbortError' || err.message?.includes('cancel')) {
         log('say-log', 'Cancelled.')

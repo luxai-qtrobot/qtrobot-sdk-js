@@ -1,4 +1,4 @@
-import type { MqttOptions, WebRtcOptions } from '@luxai-qtrobot/magpie'
+import { Logger, type MqttOptions, type WebRtcOptions } from '@luxai-qtrobot/magpie'
 import { Transport, MqttTransport, WebRtcTransport, WebRtcSignalingParams, SystemDescription, UnsupportedApiError } from './transport'
 import { TypedStreamReader, TypedStreamWriter, FrameFactory, FrameSerializer } from './streams'
 import { RobotApiError } from './actions'
@@ -201,6 +201,7 @@ export class Robot {
     if (!raw?.status) {
       throw new RobotApiError(`Service '${serviceName}' returned status=false`)
     }
+    Logger.info(`RPC call to '${serviceName}' response: ${JSON.stringify(raw.response)}`)
     return raw.response
   }
 

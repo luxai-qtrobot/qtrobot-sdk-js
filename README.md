@@ -13,6 +13,8 @@ A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) ro
 ## Table of Contents
 
 - [Installation](#installation)
+  - [npm](#npm)
+  - [CDN (no bundler required)](#cdn-no-bundler-required)
 - [Connecting to the Robot](#connecting-to-the-robot)
   - [MQTT transport](#mqtt-transport)
   - [WebRTC transport](#webrtc-transport)
@@ -38,11 +40,54 @@ A TypeScript/JavaScript SDK for communicating with [LuxAI](https://luxai.com) ro
 
 ## Installation
 
+### npm
+
 ```bash
 npm install @luxai-qtrobot/robot-sdk
 ```
 
 Node.js **≥ 18** is required (uses native `AbortController`, `AbortSignal`, `Symbol.asyncIterator`, and `Symbol.dispose`).
+
+### CDN (no bundler required)
+
+Drop a single `<script>` tag into any HTML page — no build step needed:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@luxai-qtrobot/robot-sdk/dist/qtrobot-sdk.umd.js"></script>
+```
+
+All exports are available under the global `QTRobotSDK` object:
+
+```js
+const { Robot } = QTRobotSDK
+```
+
+**Minimal browser example (MQTT over WebSocket):**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@luxai-qtrobot/robot-sdk/dist/qtrobot-sdk.umd.js"></script>
+</head>
+<body>
+<script>
+  const { Robot } = QTRobotSDK
+
+  // Browsers require WebSocket — use ws:// or wss://, not mqtt://
+  const robot = await Robot.connectMqtt('ws://192.168.1.100:9001', 'QTRD000320')
+  console.log(`Connected to ${robot.robotId}`)
+
+  const ret = await robot.tts.sayText({ text: 'Hello from the browser!' })
+  console.log('sayText response:', ret)
+
+  robot.close()
+</script>
+</body>
+</html>
+```
+
+> **Note:** Browsers cannot open raw TCP connections. Always use `ws://` (plain WebSocket) or `wss://` (WebSocket + TLS) in browser environments. Node.js supports all schemes including `mqtt://` and `mqtts://`.
 
 ---
 
@@ -158,14 +203,19 @@ const robot = await Robot.connect(new MyCustomTransport())
 
 All RPC methods are `async` and return a `Promise`. Use `await` to block until the robot responds.
 
-```typescript
-// Blocks until the robot finishes speaking
-await robot.tts.sayText({ text: 'Hello world!' })
+Every call returns the raw `response` value from the robot server. Query methods return a typed value (`string[]`, `boolean`, `object`, …). Action methods (say text, show emotion, home motors, …) return `unknown` — the server always sends at least a `true`/`false` in the response, which you can optionally inspect:
 
-// Returns a value immediately after the robot responds
+```typescript
+// Action — check the server response
+const ret = await robot.tts.sayText({ text: 'Hello world!' })
+console.log('response:', ret)   // e.g. true
+
+// Query — typed return value
 const engines = await robot.tts.listEngines()
 console.log(engines)  // ['acapela', 'azure', ...]
 ```
+
+If the server reports failure (`status=false`), the SDK throws a `RobotApiError` before returning — so you only need to inspect the return value for application-level logic, not for transport errors.
 
 Methods with parameters always take a **single options object**, with required fields typed as non-optional and optional fields typed with `?`:
 
@@ -311,19 +361,19 @@ robot.tts.<method>(options)
 |---|---|---|
 | `listEngines()` | `string[]` | All loaded TTS engine IDs |
 | `getDefaultEngine()` | `string` | Current default engine ID |
-| `setDefaultEngine({ engine })` | — | Set the default engine |
+| `setDefaultEngine({ engine })` | `unknown` | Set the default engine |
 | `getLanguages({ engine? })` | `string[]` | Supported language codes |
 | `getVoices({ engine? })` | `object[]` | Available voices |
 | `supportsSsml({ engine? })` | `boolean` | Whether the engine accepts SSML |
 | `getConfig({ engine? })` | `object` | Current engine configuration |
-| `setConfig({ config, engine? })` | — | Update engine configuration |
+| `setConfig({ config, engine? })` | `unknown` | Update engine configuration |
 
 **Speech:**
 
 | Method | Returns | Description |
 |---|---|---|
-| `sayText({ text, engine?, lang?, voice?, rate?, pitch?, volume?, style?, signal? })` | — | Speak plain text (blocks until done) |
-| `saySsml({ ssml, engine?, signal? })` | — | Speak SSML markup (blocks until done) |
+| `sayText({ text, engine?, lang?, voice?, rate?, pitch?, volume?, style?, signal? })` | `unknown` | Speak plain text (blocks until done) |
+| `saySsml({ ssml, engine?, signal? })` | `unknown` | Speak SSML markup (blocks until done) |
 
 > All `engine?` parameters are optional — the default engine is used when omitted.
 
@@ -374,8 +424,8 @@ robot.face.<method>(options)
 | Method | Returns | Description |
 |---|---|---|
 | `listEmotions()` | `string[]` | Available emotion animation file paths |
-| `showEmotion({ emotion, speed?, signal? })` | — | Play an emotion animation (blocks until done) |
-| `look({ l_eye, r_eye, duration? })` | — | Move eye pupils; auto-reset to centre if `duration > 0` |
+| `showEmotion({ emotion, speed?, signal? })` | `unknown` | Play an emotion animation (blocks until done) |
+| `look({ l_eye, r_eye, duration? })` | `unknown` | Move eye pupils; auto-reset to centre if `duration > 0` |
 
 > `l_eye` and `r_eye` are `[dx, dy]` pixel offsets from the centre of each eye.
 
@@ -415,10 +465,10 @@ robot.gesture.<method>(options)
 |---|---|---|
 | `listFiles()` | `string[]` | Available gesture file names |
 | `playFile({ gesture, speed_factor?, signal? })` | `boolean` | Play a named gesture file (blocks until done) |
-| `play({ keyframes, resample?, rate_hz?, speed_factor?, signal? })` | — | Play in-memory keyframes (blocks until done) |
+| `play({ keyframes, resample?, rate_hz?, speed_factor?, signal? })` | `unknown` | Play in-memory keyframes (blocks until done) |
 | `record({ motors, release_motors?, delay_start_ms?, timeout_ms?, refine_keyframe?, keyframe_pos_eps?, keyframe_max_gap_us?, signal? })` | `object` | Record a gesture trajectory (blocks until stopped or timed out) |
 | `stopRecord()` | `boolean` | Stop an in-progress recording |
-| `storeRecord({ gesture })` | — | Persist the last recording as a named file |
+| `storeRecord({ gesture })` | `unknown` | Persist the last recording as a named file |
 
 **Stream methods:**
 
@@ -476,15 +526,15 @@ robot.motor.<method>(options)
 | Method | Returns | Description |
 |---|---|---|
 | `list()` | `object` | All motor names and their configuration |
-| `on({ motor })` | — | Enable torque on a single motor |
-| `off({ motor })` | — | Disable torque on a single motor |
-| `onAll()` | — | Enable torque on all motors |
-| `offAll()` | — | Disable torque on all motors |
-| `home({ motor })` | — | Move a single motor to its home position |
-| `homeAll()` | — | Move all motors to their home positions |
-| `setVelocity({ motor, velocity })` | — | Set the default velocity limit for a motor |
-| `setCalib({ motor, offset?, overload_threshold?, velocity_max?, store? })` | — | Apply calibration parameters (optionally persist) |
-| `calibAll()` | — | Re-apply stored calibration to all motors |
+| `on({ motor })` | `unknown` | Enable torque on a single motor |
+| `off({ motor })` | `unknown` | Disable torque on a single motor |
+| `onAll()` | `unknown` | Enable torque on all motors |
+| `offAll()` | `unknown` | Disable torque on all motors |
+| `home({ motor })` | `unknown` | Move a single motor to its home position |
+| `homeAll()` | `unknown` | Move all motors to their home positions |
+| `setVelocity({ motor, velocity })` | `unknown` | Set the default velocity limit for a motor |
+| `setCalib({ motor, offset?, overload_threshold?, velocity_max?, store? })` | `unknown` | Apply calibration parameters (optionally persist) |
+| `calibAll()` | `unknown` | Re-apply stored calibration to all motors |
 
 **Stream methods:**
 
@@ -549,17 +599,17 @@ robot.media.<method>(options)
 | Method | Returns | Description |
 |---|---|---|
 | `getFgAudioVolume()` | `number` | FG lane volume `[0.0, 1.0]` |
-| `setFgAudioVolume({ value })` | — | Set FG lane volume |
+| `setFgAudioVolume({ value })` | `unknown` | Set FG lane volume |
 | `getBgAudioVolume()` | `number` | BG lane volume |
-| `setBgAudioVolume({ value })` | — | Set BG lane volume |
+| `setBgAudioVolume({ value })` | `unknown` | Set BG lane volume |
 
 **FG file playback:**
 
 | Method | Returns | Description |
 |---|---|---|
 | `playFgAudioFile({ uri, signal? })` | `boolean` | Play a file or URL (blocks until done) |
-| `pauseFgAudioFile()` | — | Pause the current FG file |
-| `resumeFgAudioFile()` | — | Resume the paused FG file |
+| `pauseFgAudioFile()` | `unknown` | Pause the current FG file |
+| `resumeFgAudioFile()` | `unknown` | Resume the paused FG file |
 
 **BG file playback:** same pattern — `playBgAudioFile`, `pauseBgAudioFile`, `resumeBgAudioFile`.
 
@@ -569,8 +619,8 @@ robot.media.<method>(options)
 |---|---|
 | `openFgAudioStreamWriter()` | Open a writer to stream raw PCM frames to the FG lane |
 | `openBgAudioStreamWriter()` | Open a writer to stream raw PCM frames to the BG lane |
-| `cancelFgAudioStream()` | Stop a running FG PCM stream |
-| `cancelBgAudioStream()` | Stop a running BG PCM stream |
+| `cancelFgAudioStream()` | Stop the active FG PCM stream (`unknown` response) |
+| `cancelBgAudioStream()` | Stop the active BG PCM stream (`unknown` response) |
 
 **Examples:**
 
@@ -628,10 +678,10 @@ robot.media.<method>(options)
 | Method | Returns | Description |
 |---|---|---|
 | `playFgVideoFile({ uri, speed?, with_audio?, signal? })` | `boolean` | Play FG video file (blocks until done) |
-| `pauseFgVideoFile()` | — | Pause the current FG video |
-| `resumeFgVideoFile()` | — | Resume the paused FG video |
-| `cancelFgVideoStream()` | — | Stop the active FG video stream |
-| `setFgVideoAlpha({ value })` | — | Set FG layer transparency `[0.0 transparent … 1.0 opaque]` |
+| `pauseFgVideoFile()` | `unknown` | Pause the current FG video |
+| `resumeFgVideoFile()` | `unknown` | Resume the paused FG video |
+| `cancelFgVideoStream()` | `unknown` | Stop the active FG video stream |
+| `setFgVideoAlpha({ value })` | `unknown` | Set FG layer transparency `[0.0 transparent … 1.0 opaque]` |
 
 **BG video:** same pattern — `playBgVideoFile`, `pauseBgVideoFile`, `resumeBgVideoFile`, `cancelBgVideoStream`.
 
