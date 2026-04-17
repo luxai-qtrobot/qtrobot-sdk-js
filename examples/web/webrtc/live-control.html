@@ -174,6 +174,7 @@
 </div>
 
 <script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<!-- <script src="https://cdn.jsdelivr.net/npm/@luxai-qtrobot/robot-sdk/dist/qtrobot-sdk.umd.js"></script> -->
 <script src="webrtc-connect.js"></script>
 <script>
   const { Robot, JointCommandFrame, Logger } = QTRobotSDK
@@ -221,7 +222,7 @@
 
     // Microphone — start muted
     try {
-      const track = await robot.extra.getAudioTrack()
+      const track = await robot.extra.receiveAudioTrack('/mic/int/audio/ch0/stream:o')
       const audioEl = document.getElementById('audio-el')
       audioEl.srcObject = new MediaStream([track])
       audioEl.muted = true
@@ -278,7 +279,7 @@
       document.getElementById('btn-camera').textContent = 'Stop Camera'
       document.getElementById('btn-camera').className   = 'danger'
       document.getElementById('btn-camera').disabled    = false
-      const track = await robot.camera.extra.getVideoTrack()
+      const track = await robot.camera.extra.receiveVideoTrack('/camera/color/image')
       document.getElementById('video-el').srcObject = new MediaStream([track])
       Logger.info('[live-control] Camera live.')
     } catch (err) {

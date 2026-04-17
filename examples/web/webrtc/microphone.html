@@ -132,7 +132,7 @@
       setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
 
       log('Requesting audio track…')
-      const track = await robot.extra.getAudioTrack()
+      const track = await robot.extra.receiveAudioTrack('/mic/int/audio/ch0/stream:o')
       const audioEl = document.getElementById('audio-el')
       audioEl.srcObject = new MediaStream([track])
       muted = false

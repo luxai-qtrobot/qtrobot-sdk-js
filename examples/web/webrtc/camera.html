@@ -220,7 +220,7 @@
       log('video-log', 'Plugin connected. Requesting video track…')
 
       // Get video track and attach to <video>
-      const track = await robot.camera.extra.getVideoTrack()
+      const track = await robot.camera.extra.receiveVideoTrack('/camera/color/image')
       document.getElementById('video-el').srcObject = new MediaStream([track])
       log('video-log', 'Streaming live camera video.')
 
