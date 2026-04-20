@@ -206,11 +206,16 @@ export class WebRtcTransport extends Transport {
    * @param sessionId        WebRTC session identifier — `robotId` for the robot peer,
    *                         `nodeId` for a plugin peer
    * @param signalingParams  Full signaling config stored for plugin inheritance
+   * @param preConnect       Optional callback invoked after the MQTT signaling connection
+   *                         is established but before WebRTC negotiation begins.
+   *                         Use this to call `conn.sendVideoTrack()` / `conn.sendAudioTrack()`
+   *                         before `connect()` is called.
    */
   static async create(
     brokerUrl: string,
     sessionId: string,
     signalingParams: WebRtcSignalingParams,
+    preConnect?: (conn: WebRtcConnection) => void | Promise<void>,
   ): Promise<WebRtcTransport> {
     const conn = await WebRtcConnection.withMqtt(brokerUrl, sessionId, {
       clientId: `qtrobot-sdk-${sessionId}-${Math.random().toString(36).slice(2, 8)}`,
@@ -218,6 +223,7 @@ export class WebRtcTransport extends Transport {
       reconnect: signalingParams.reconnect,
       webrtcOptions: signalingParams.webrtcOptions,
     })
+    if (preConnect) await preConnect(conn)
     const connected = await conn.connect(signalingParams.connectTimeoutSec)
     if (!connected) {
       await conn.disconnect()

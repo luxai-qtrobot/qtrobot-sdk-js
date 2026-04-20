@@ -25,6 +25,17 @@ export type ConnectWebrtcMqttOptions = {
   reconnect?: boolean
   connectTimeoutSec?: number
   defaultRpcTimeoutSec?: number
+  /**
+   * Called after MQTT signaling is ready but before WebRTC negotiation begins.
+   * Use this to register local media tracks that should be sent to the remote peer:
+   * ```js
+   * preConnect: async (conn) => {
+   *   const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+   *   conn.sendVideoTrack(stream.getVideoTracks()[0], '/media/video/fg/stream:i')
+   * }
+   * ```
+   */
+  preConnect?: (conn: import('@luxai-qtrobot/magpie').WebRtcConnection) => void | Promise<void>
 }
 
 // ─── Route entry — transport-aware ───────────────────────────────────────────
@@ -164,7 +175,7 @@ export class Robot {
       reconnect: options?.reconnect ?? false,
       connectTimeoutSec,
     }
-    const transport = await WebRtcTransport.create(brokerUrl, robotId, signalingParams)
+    const transport = await WebRtcTransport.create(brokerUrl, robotId, signalingParams, options?.preConnect)
     try {
       return await Robot.connect(transport, { connectTimeoutSec, defaultRpcTimeoutSec: options?.defaultRpcTimeoutSec })
     } catch (err) {

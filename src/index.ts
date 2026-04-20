@@ -7,7 +7,8 @@ export { TypedStreamReader, TypedStreamWriter } from './streams'
 export { Transport, MqttTransport, WebRtcTransport, UnsupportedApiError } from './transport'
 export type { WebRtcSignalingParams } from './transport'
 
-// Re-export WebRTC option types for users building custom transports
+// Re-export WebRTC types for users building custom transports or direct connections
+export { WebRtcConnection } from '@luxai-qtrobot/magpie'
 export type { WebRtcOptions, WebRtcTurnServer } from '@luxai-qtrobot/magpie'
 
 // Frame types

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QTRobot SDK — Live Video Call (WebRTC)</title>
+  <link rel="stylesheet" href="../common.css" />
+  <style>
+    /* ── Full-viewport layout ────────────────────────── */
+    html { height: 100%; }
+    body {
+      min-height: unset;
+      height: 100%;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      padding: 8px 16px;
+      margin-bottom: 0;
+      flex-shrink: 0;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    /* ── Connection panel ────────────────────────────── */
+    #connection-panel { margin: 12px 16px; flex-shrink: 0; overflow-y: auto; }
+    .hint { font-size: .78rem; color: #475569; }
+
+    /* ── Video call area ─────────────────────────────── */
+    #video-area {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      background: #0f172a;
+      overflow: hidden;
+    }
+    #video-el {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    #self-view {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      width: 20%;
+      min-width: 120px;
+      max-width: 200px;
+      aspect-ratio: 4 / 3;
+      border-radius: 10px;
+      border: 2px solid #475569;
+      background: #1e293b;
+      object-fit: cover;
+      z-index: 10;
+    }
+    #video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #475569;
+      font-size: .9rem;
+      pointer-events: none;
+    }
+    #video-placeholder .icon { font-size: 2.5rem; }
+
+    /* ── Toolbar ─────────────────────────────────────── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .tb-sep {
+      width: 1px;
+      height: 28px;
+      background: #334155;
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+    #toolbar button {
+      height: 32px;
+      min-width: 32px;
+      padding: 0 8px;
+      font-size: .8rem;
+      flex-shrink: 0;
+    }
+    #toolbar select {
+      width: auto;
+      height: 30px;
+      font-size: .78rem;
+      padding: 0 4px;
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .head-pos {
+      font-size: .72rem;
+      color: #64748b;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .head-pos span { color: #94a3b8; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>QTRobot</span> SDK — Live Video Call (WebRTC)</h1>
+  <div id="status">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<!-- ── Connection panel (hidden during call) ── -->
+<div id="connection-panel" class="card">
+  <h2>Connection</h2>
+  <div class="row">
+    <div style="flex:1">
+      <label>Broker URL (MQTT signaling)</label>
+      <input id="broker-uri" type="text" value="wss://48.209.57.190:8084" placeholder="wss://host:8084" />
+    </div>
+    <div style="flex:0 0 160px">
+      <label>Robot ID</label>
+      <input id="robot-id" type="text" value="QTRD000320" placeholder="QTRD000000" />
+    </div>
+  </div>
+  <div class="row">
+    <div style="flex:0 0 160px">
+      <label>MQTT Auth</label>
+      <select id="auth-mode" onchange="onAuthModeChange()">
+        <option value="none">none</option>
+        <option value="username_password" selected>user / pass</option>
+      </select>
+    </div>
+    <div id="auth-user-wrap" style="flex:1;display:block">
+      <label>Username</label>
+      <input id="auth-username" type="text" placeholder="Username" />
+    </div>
+    <div id="auth-pass-wrap" style="flex:1;display:block">
+      <label>Password</label>
+      <input id="auth-password" type="password" placeholder="Password" />
+    </div>
+  </div>
+  <div class="row">
+    <div style="flex:1">
+      <label>STUN server</label>
+      <input id="stun-url" type="text" value="stun:stun.l.google.com:19302" placeholder="stun:host:port" />
+    </div>
+    <div style="flex:2">
+      <label>TURN server (optional)</label>
+      <input id="turn-url" type="text" value="turn:48.209.57.190:3478" placeholder="turn:host:port" />
+    </div>
+    <div style="flex:1">
+      <label>Username</label>
+      <input id="turn-user" type="text" placeholder="Username" />
+    </div>
+    <div style="flex:1">
+      <label>Credential</label>
+      <input id="turn-pass" type="password" placeholder="Credential" />
+    </div>
+  </div>
+  <div class="row" style="border-top:1px solid #334155;padding-top:10px;margin-top:4px">
+    <div style="flex:1">
+      <label>Camera plugin node ID</label>
+      <input id="plugin-id" type="text" value="qtrobot-realsense-driver" placeholder="e.g. qtrobot-realsense-driver" />
+    </div>
+    <div style="flex:1">
+      <label>Face video topic</label>
+      <input id="face-topic" type="text" value="/media/video/fg/stream:i" />
+    </div>
+    <div style="flex:1">
+      <label>Face audio topic</label>
+      <input id="mic-topic" type="text" value="/media/audio/fg/stream:i" />
+    </div>
+  </div>
+  <div class="row" style="justify-content:flex-end;margin-top:8px">
+    <button id="btn-call" class="success" onclick="toggleCall()" style="font-size:1rem;padding:0 28px;height:44px">
+      📞 Call
+    </button>
+  </div>
+</div>
+
+<!-- ── Video call area (shown during call) ── -->
+<div id="video-area" style="display:none">
+  <div id="video-placeholder">
+    <div class="icon">📷</div>
+    <div>Starting robot camera…</div>
+  </div>
+  <video id="video-el" autoplay playsinline muted></video>
+  <video id="self-view" autoplay playsinline muted></video>
+  <audio id="audio-el" autoplay style="display:none"></audio>
+</div>
+
+<!-- ── Toolbar (shown during call) ── -->
+<div id="toolbar" style="display:none">
+
+  <!-- Head D-pad -->
+  <button class="primary" id="btn-left"  disabled onclick="moveHead(1, 0)"  title="Head left">◄</button>
+  <button class="primary" id="btn-up"    disabled onclick="moveHead(0, -1)" title="Head up">▲</button>
+  <button class="primary" id="btn-down"  disabled onclick="moveHead(0,  1)" title="Head down">▼</button>
+  <button class="primary" id="btn-right" disabled onclick="moveHead(-1, 0)" title="Head right">►</button>
+  <select id="head-step" title="Step size">
+    <option value="3">3°</option>
+    <option value="5" selected>5°</option>
+    <option value="10">10°</option>
+  </select>
+  <div class="head-pos">
+    Y&nbsp;<span id="head-yaw">—</span>&nbsp;&nbsp;P&nbsp;<span id="head-pitch">—</span>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <!-- My camera & mic -->
+  <button id="btn-cam-toggle" class="primary" onclick="toggleLocalCam()" title="Toggle your camera">📷</button>
+  <button id="btn-mic-toggle" class="primary" onclick="toggleLocalMic()" title="Toggle your microphone">🎤</button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Robot camera plugin -->
+  <button id="btn-camera" class="primary" disabled onclick="toggleCamera()" title="Robot camera">🎥 Camera</button>
+
+  <div class="tb-sep"></div>
+
+  <!-- Hang up -->
+  <button class="danger" onclick="toggleCall()">🔴 Hang Up</button>
+
+</div>
+
+<script src="../../../dist/qtrobot-sdk.umd.js"></script>
+<script src="webrtc-connect.js"></script>
+<script>
+  const { Robot, JointCommandFrame, Logger } = QTRobotSDK
+
+  let robot       = null
+  let cameraReady = false
+  let headReader  = null
+  let headYaw     = 0
+  let headPitch   = 0
+  let localStream = null   // combined camera + mic stream from getUserMedia
+  let camEnabled  = true
+  let micEnabled  = true
+
+  // ── Status ────────────────────────────────────────────────────────────────
+
+  function setStatus(state, detail) {
+    const dot  = document.getElementById('status-dot')
+    const text = document.getElementById('status-text')
+    dot.className    = state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''
+    text.textContent = detail ?? { connected: 'Connected', connecting: 'Connecting…', disconnected: 'Disconnected' }[state]
+
+    const connected = state === 'connected'
+    ;['btn-left','btn-right','btn-up','btn-down','btn-cam-toggle','btn-mic-toggle','btn-camera'].forEach(id =>
+      document.getElementById(id).disabled = !connected
+    )
+    document.getElementById('btn-call').disabled = state === 'connecting'
+  }
+
+  // ── Call / Hang Up ────────────────────────────────────────────────────────
+
+  async function toggleCall() {
+    if (robot) { await doDisconnect(); return }
+
+    const broker  = document.getElementById('broker-uri').value.trim()
+    const robotId = document.getElementById('robot-id').value.trim()
+    if (!broker || !robotId) { alert('Enter broker URL and Robot ID.'); return }
+
+    const faceTopic = document.getElementById('face-topic').value.trim() || '/media/video/fg/stream:i'
+    const micTopic  = document.getElementById('mic-topic').value.trim()  || '/media/audio/fg/stream:i'
+
+    // Step 1: request camera + mic — browser asks permission here
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
+      // Start muted — user explicitly unmutes via toolbar buttons
+      camEnabled = false
+      micEnabled = false
+      localStream.getVideoTracks().forEach(t => { t.enabled = false })
+      localStream.getAudioTracks().forEach(t => { t.enabled = false })
+      document.getElementById('self-view').srcObject = localStream
+      updateMediaButtons()
+    } catch (err) {
+      alert(`Camera / microphone access denied: ${err.message}`)
+      return
+    }
+
+    // Step 2: show call UI
+    document.getElementById('connection-panel').style.display = 'none'
+    document.getElementById('video-area').style.display       = 'block'
+    document.getElementById('toolbar').style.display          = 'flex'
+    setStatus('connecting')
+
+    // Step 3: connect to robot — register local tracks before WebRTC negotiation
+    try {
+      robot = await Robot.connectWebrtcMqtt(broker, robotId, {
+        ...buildConnectOptions(),
+        preConnect: (conn) => {
+          conn.sendVideoTrack(localStream.getVideoTracks()[0], faceTopic)
+          conn.sendAudioTrack(localStream.getAudioTracks()[0], micTopic)
+          Logger.info('[live-control] Face cam + mic registered via preConnect')
+        },
+      })
+      setStatus('connected', `Connected to ${robot.robotId} (${robot.robotType ?? 'unknown'})`)
+    } catch (err) {
+      await doDisconnect()
+      alert(`Connection failed: ${err.message}`)
+      return
+    }
+
+    // Step 4: receive robot microphone audio
+    try {
+      const track = await robot.extra.receiveAudioTrack('/mic/int/audio/ch0/stream:o')
+      const audioEl = document.getElementById('audio-el')
+      audioEl.srcObject = new MediaStream([track])
+    } catch (err) {
+      Logger.error(`[live-control] Robot mic unavailable: ${err.message}`)
+    }
+
+    // Step 5: start head reader + auto-start camera plugin
+    startHeadReader()
+    autoStartCamera()
+  }
+
+  async function doDisconnect() {
+    stopHeadReader()
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null }
+    document.getElementById('video-el').srcObject  = null
+    document.getElementById('self-view').srcObject = null
+    document.getElementById('audio-el').srcObject  = null
+    document.getElementById('video-placeholder').style.display = 'flex'
+    robot?.close()
+    robot = null
+    cameraReady = false
+    document.getElementById('head-yaw').textContent   = '—'
+    document.getElementById('head-pitch').textContent = '—'
+    document.getElementById('btn-camera').textContent = '🎥 Camera'
+    document.getElementById('btn-camera').className   = 'primary'
+    document.getElementById('connection-panel').style.display = 'block'
+    document.getElementById('video-area').style.display       = 'none'
+    document.getElementById('toolbar').style.display          = 'none'
+    Logger.info('[live-control] Disconnected.')
+    setStatus('disconnected')
+  }
+
+  // ── Local camera / mic toggles ────────────────────────────────────────────
+
+  function toggleLocalCam() {
+    if (!localStream) return
+    camEnabled = !camEnabled
+    localStream.getVideoTracks().forEach(t => { t.enabled = camEnabled })
+    updateMediaButtons()
+  }
+
+  function toggleLocalMic() {
+    if (!localStream) return
+    micEnabled = !micEnabled
+    localStream.getAudioTracks().forEach(t => { t.enabled = micEnabled })
+    updateMediaButtons()
+  }
+
+  function updateMediaButtons() {
+    const camBtn = document.getElementById('btn-cam-toggle')
+    const micBtn = document.getElementById('btn-mic-toggle')
+    camBtn.textContent = camEnabled ? '📷' : '🚫📷'
+    camBtn.className   = camEnabled ? 'primary' : 'warn'
+    micBtn.textContent = micEnabled ? '🎤' : '🔇'
+    micBtn.className   = micEnabled ? 'primary' : 'warn'
+  }
+
+  // ── Camera plugin ─────────────────────────────────────────────────────────
+
+  async function autoStartCamera() {
+    const nodeId = document.getElementById('plugin-id').value.trim()
+    if (!nodeId) return
+    document.getElementById('btn-camera').disabled = true
+    await _enableCamera(nodeId)
+  }
+
+  async function toggleCamera() {
+    if (cameraReady) {
+      robot.disablePlugin('camera')
+      cameraReady = false
+      document.getElementById('video-el').srcObject = null
+      document.getElementById('video-placeholder').style.display = 'flex'
+      document.getElementById('btn-camera').textContent = '🎥 Camera'
+      document.getElementById('btn-camera').className   = 'primary'
+      document.getElementById('btn-camera').disabled    = false
+      Logger.info('[live-control] Camera plugin stopped.')
+      return
+    }
+    const nodeId = document.getElementById('plugin-id').value.trim()
+    if (!nodeId) { alert('Enter camera plugin node ID.'); return }
+    document.getElementById('btn-camera').disabled = true
+    await _enableCamera(nodeId)
+  }
+
+  async function _enableCamera(nodeId) {
+    Logger.info(`[live-control] Connecting to camera plugin "${nodeId}"…`)
+    try {
+      try {
+        await robot.enablePluginWebrtcMqtt('camera', nodeId, { connectTimeoutSec: 30 })
+      } catch (err) {
+        if (!err.message?.includes('no ACK')) throw err
+        Logger.info('[live-control] Plugin data channel not ready, retrying in 1s…')
+        await new Promise(r => setTimeout(r, 1000))
+        await robot.enablePluginWebrtcMqtt('camera', nodeId, { connectTimeoutSec: 30 })
+      }
+      cameraReady = true
+      document.getElementById('btn-camera').textContent = '⏹ Camera'
+      document.getElementById('btn-camera').className   = 'danger'
+      document.getElementById('btn-camera').disabled    = false
+      const track = await robot.camera.extra.receiveVideoTrack('/camera/color/image')
+      document.getElementById('video-el').srcObject = new MediaStream([track])
+      document.getElementById('video-placeholder').style.display = 'none'
+      Logger.info('[live-control] Camera live.')
+    } catch (err) {
+      document.getElementById('btn-camera').disabled = false
+      Logger.error(`[live-control] Camera plugin failed: ${err.message}`)
+    }
+  }
+
+  // ── Head joint state ──────────────────────────────────────────────────────
+
+  function startHeadReader() {
+    headReader = robot.motor.jointsStateReader()
+    ;(async () => {
+      while (headReader) {
+        try {
+          const frame  = await headReader.read(3.0)
+          const joints = frame.joints()
+          const valid  = v => Math.abs(v) <= 180
+          if (joints.includes('HeadYaw'))   { const v = frame.position('HeadYaw');   if (valid(v)) headYaw   = v }
+          if (joints.includes('HeadPitch')) { const v = frame.position('HeadPitch'); if (valid(v)) headPitch = v }
+          document.getElementById('head-yaw').textContent   = headYaw.toFixed(1)   + '°'
+          document.getElementById('head-pitch').textContent = headPitch.toFixed(1) + '°'
+        } catch (err) {
+          if (!headReader) break
+          if (err.name === 'TimeoutError') continue
+          break
+        }
+      }
+    })()
+  }
+
+  function stopHeadReader() {
+    if (headReader) { headReader.close(); headReader = null }
+  }
+
+  // ── Head control ──────────────────────────────────────────────────────────
+
+  async function moveHead(yawDir, pitchDir) {
+    const step     = parseFloat(document.getElementById('head-step').value)
+    const newYaw   = headYaw   + yawDir   * step
+    const newPitch = headPitch + pitchDir * step
+    Logger.info(`[moveHead] yaw=${newYaw.toFixed(1)} pitch=${newPitch.toFixed(1)} step=${step}`)
+    try {
+      const writer = robot.motor.openJointsCommandWriter()
+      Logger.info(`[moveHead] writer created`)
+      const cmd    = new JointCommandFrame()
+      if (yawDir   !== 0) cmd.setJoint('HeadYaw',   { position: newYaw })
+      if (pitchDir !== 0) cmd.setJoint('HeadPitch', { position: newPitch })
+      Logger.info(`[moveHead] sending cmd: ${JSON.stringify(cmd.toDict())}`)
+      await writer.write(cmd)
+      Logger.info(`[moveHead] write done`)
+      writer.close()
+    } catch (err) {
+      Logger.error(`[live-control] Head move failed: ${err.name}: ${err.message}`)
+    }
+  }
+</script>
+</body>
+</html>
