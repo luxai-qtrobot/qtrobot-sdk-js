@@ -58,7 +58,7 @@ export type StreamEntry = {
   direction: 'in' | 'out'
   /** TypeScript class used in the generated API */
   frameClass: FrameClass
-  /** Default internal queue size for subscriber */
+  /** Default internal queue size for reader */
   queueSize?: number
   /** JSDoc description for the generated method(s) */
   doc: string

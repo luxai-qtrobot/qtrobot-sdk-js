@@ -1,12 +1,12 @@
 import {
   MqttConnection,
   MqttRpcRequester,
-  MqttSubscriber,
-  MqttPublisher,
+  MqttStreamReader,
+  MqttStreamWriter,
   WebRtcConnection,
   WebRtcRpcRequester,
-  WebRtcSubscriber,
-  WebRtcPublisher,
+  WebRtcStreamReader,
+  WebRtcStreamWriter,
   RpcRequester,
   StreamReader,
   StreamWriter,
@@ -59,10 +59,10 @@ export abstract class Transport {
   /** Return an RPC requester for the given resolved topic/address. */
   abstract getRequester(topic: string): RpcRequester
 
-  /** Return a stream reader (subscriber) for the given resolved topic/address. */
+  /** Return a stream reader for the given resolved topic/address. */
   abstract getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader
 
-  /** Return a stream writer (publisher). */
+  /** Return a stream writer. */
   abstract getPublisher(): StreamWriter
 
   /** Close all resources held by this transport. */
@@ -100,11 +100,11 @@ export class MqttTransport extends Transport {
   }
 
   getSubscriber(topic: string, qos?: number, queueSize?: number): StreamReader {
-    return new MqttSubscriber(this._conn, { topic, qos: qos as 0 | 1 | 2 | undefined, queueSize })
+    return new MqttStreamReader(this._conn, { topic, qos: qos as 0 | 1 | 2 | undefined, queueSize })
   }
 
   getPublisher(): StreamWriter {
-    return new MqttPublisher(this._conn)
+    return new MqttStreamWriter(this._conn)
   }
 
   close(): void {
@@ -177,11 +177,11 @@ export class WebRtcTransport extends Transport {
   }
 
   getSubscriber(topic: string, _qos?: number, queueSize?: number): StreamReader {
-    return new WebRtcSubscriber(this._conn, topic, queueSize)
+    return new WebRtcStreamReader(this._conn, topic, queueSize)
   }
 
   getPublisher(): StreamWriter {
-    return new WebRtcPublisher(this._conn)
+    return new WebRtcStreamWriter(this._conn)
   }
 
   close(): void {
