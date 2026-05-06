@@ -1,6 +1,6 @@
 {
   "name": "@luxai-qtrobot/robot-sdk",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "QTrobot SDK for TypeScript/JavaScript — connect and control QTrobot over MQTT or WebRTC",
   "keywords": [
     "qtrobot",
@@ -35,6 +35,7 @@
     "dist"
   ],
   "scripts": {
+    "prepublishOnly": "npm run build",
     "gen": "tsx scripts/gen_api.ts",
     "build": "tsup",
     "dev": "tsup --watch",
@@ -50,7 +51,7 @@
     "example:media:video": "tsx examples/media_video_example.ts"
   },
   "dependencies": {
-    "@luxai-qtrobot/magpie": "^0.5.0"
+    "@luxai-qtrobot/magpie": "^0.5.2"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
